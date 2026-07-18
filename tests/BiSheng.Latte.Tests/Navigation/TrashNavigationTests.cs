@@ -10,6 +10,11 @@ using Xunit;
 namespace BiSheng.Latte.Tests.Navigation;
 
 /// <summary>TrashService 恢复/永久删除时发布导航增量</summary>
+/// <remarks>
+/// 必须走 WpfSta：MutationPublisher 使用 waitForPresentation，
+/// 若 Application.Current 已由其它 StaFact 创建却在非 UI 线程 Invoke，会永久死锁。
+/// </remarks>
+[Collection("WpfSta")]
 public class TrashNavigationTests : IDisposable
 {
     private readonly LatteTestDbFactory _fixture;
@@ -22,7 +27,7 @@ public class TrashNavigationTests : IDisposable
     public void Dispose() => _fixture.Dispose();
 
     /// <summary>恢复软删笔记应发布 Create delta</summary>
-    [Fact]
+    [StaFact]
     public void Restore_DeletedNote_PublishesNoteCreated()
     {
         var folderId = Guid.NewGuid();
@@ -61,7 +66,7 @@ public class TrashNavigationTests : IDisposable
     }
 
     /// <summary>永久删除仍在导航中的项应发布 Delete delta</summary>
-    [Fact]
+    [StaFact]
     public void PurgePermanently_VisibleNote_PublishesDelete()
     {
         var folderId = Guid.NewGuid();
@@ -97,7 +102,7 @@ public class TrashNavigationTests : IDisposable
     }
 
     /// <summary>永久删除已在回收站的项不发布导航变更</summary>
-    [Fact]
+    [StaFact]
     public void PurgePermanently_SoftDeletedNote_DoesNotPublish()
     {
         var folderId = Guid.NewGuid();

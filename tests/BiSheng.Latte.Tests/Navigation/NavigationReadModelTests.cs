@@ -5,10 +5,12 @@ using Xunit;
 namespace BiSheng.Latte.Tests.Navigation;
 
 /// <summary>NavigationReadModel：投影更新发布</summary>
+/// <remarks>waitForPresentation 依赖 UI Dispatcher；须在 WpfSta 集合内运行以免跨线程 Invoke 死锁</remarks>
+[Collection("WpfSta")]
 public class NavigationReadModelTests
 {
     /// <summary>Publish 应触发 Changed 订阅者</summary>
-    [Fact]
+    [StaFact]
     public void Publish_InvokesChangedSubscribers()
     {
         var model = new NavigationReadModel();
@@ -33,7 +35,7 @@ public class NavigationReadModelTests
     }
 
     /// <summary>Filter 投影可独立发布</summary>
-    [Fact]
+    [StaFact]
     public void Publish_FilterProjection_SetsKind()
     {
         var model = new NavigationReadModel();

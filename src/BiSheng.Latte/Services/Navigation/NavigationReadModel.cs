@@ -1,4 +1,4 @@
-using System.Windows;
+﻿using System.Windows;
 using System.Windows.Threading;
 
 namespace BiSheng.Latte.Services.Navigation;
@@ -21,7 +21,19 @@ public sealed class NavigationReadModel : INavigationReadModel
 
         if (waitForPresentation)
         {
-            dispatcher.Invoke(() => Changed?.Invoke(update));
+            // 非 UI 的 STA（如 xUnit StaFact）若 Invoke 到“建在其他线程且无消息泵”的 Dispatcher 会死锁。
+            // 生产后台投递一般为 MTA，仍走同步 Invoke；带超时避免 CI 永久挂起。
+            if (Thread.CurrentThread.GetApartmentState() == ApartmentState.STA)
+            {
+                Changed?.Invoke(update);
+                return;
+            }
+
+            dispatcher.Invoke(
+                () => Changed?.Invoke(update),
+                DispatcherPriority.Send,
+                CancellationToken.None,
+                TimeSpan.FromSeconds(30));
             return;
         }
 

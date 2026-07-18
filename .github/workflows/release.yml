@@ -17,6 +17,8 @@ permissions:
 jobs:
   test:
     runs-on: windows-latest
+    # Latte 正常约 30s；若 Dispatcher.Invoke 死锁勿空转至默认 6h
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@v4
