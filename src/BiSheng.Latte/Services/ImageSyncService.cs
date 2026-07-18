@@ -45,8 +45,7 @@ public class ImageSyncService : IDisposable
     private readonly object _downloadingLock = new();
 
     /// <summary>图片本地存储目录</summary>
-    private static string ImagesDirectory =>
-        Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "images");
+    private static string ImagesDirectory => LatteAppPaths.ImagesDirectory;
 
     /// <summary>
     /// 图片下载完成事件：参数为 (imageId, localPath)

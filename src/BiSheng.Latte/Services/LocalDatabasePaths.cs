@@ -7,14 +7,10 @@ namespace BiSheng.Latte.Services;
 public static class LocalDatabasePaths
 {
     /// <summary>默认备份目录（LocalAppData）</summary>
-    public static string DefaultBackupDirectory =>
-        Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "BiSheng", "Latte", "backups");
+    public static string DefaultBackupDirectory => LatteAppPaths.BackupDirectory;
 
     /// <summary>运行中的 local.db 路径</summary>
-    public static string DatabaseFile =>
-        Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "local.db");
+    public static string DatabaseFile => LatteAppPaths.DatabaseFile;
 
     /// <summary>兼容旧代码：等同默认备份目录</summary>
     public static string BackupDirectory => DefaultBackupDirectory;
@@ -55,7 +51,7 @@ public static class LocalDatabasePaths
         }
     }
 
-    /// <summary>备份目录是否位于应用目录内（存在误删风险）</summary>
+    /// <summary>备份目录是否位于程序安装目录内（存在随更新被覆盖/误删的风险）</summary>
     public static bool IsBackupDirectoryInsideApp(string directory)
     {
         var appRoot = Path.GetFullPath(AppDomain.CurrentDomain.BaseDirectory)

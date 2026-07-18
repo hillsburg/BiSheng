@@ -21,9 +21,7 @@ public static class FullResyncRescueStore
 
     /// <summary>默认抢救文件路径</summary>
     public static string DefaultFilePath =>
-        Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "BiSheng", "Latte", "full-resync-rescue.json");
+        Path.Combine(LatteAppPaths.Root, "full-resync-rescue.json");
 
     /// <summary>当前生效的抢救文件路径</summary>
     public static string FilePath => _pathOverride ?? DefaultFilePath;

@@ -8,7 +8,7 @@ namespace BiSheng.Latte.Services;
 /// <summary>
 /// 日志工具类：基于 NLog 的静态日志封装
 /// 
-/// 日志输出到 exe 目录下的 log 文件夹：
+/// 日志输出到 LocalAppData 下的 log 文件夹：
 /// - log/app-{date}.log   —— 所有级别（Trace ~ Fatal）
 /// - log/error-{date}.log —— 仅 Error 和 Fatal
 /// 
@@ -23,14 +23,15 @@ public static class LogHelper
 
     /// <summary>
     /// 初始化 NLog 配置（在应用启动时调用一次）
-    /// 日志目录：{exe目录}/log/
+    /// 日志目录：%LocalAppData%\BiSheng\Latte\log\
     /// </summary>
     public static void Initialize()
     {
         if (_initialized) return;
         _initialized = true;
 
-        var logDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "log");
+        LatteAppPaths.EnsureRoot();
+        var logDir = LatteAppPaths.LogDirectory;
         if (!Directory.Exists(logDir))
             Directory.CreateDirectory(logDir);
 

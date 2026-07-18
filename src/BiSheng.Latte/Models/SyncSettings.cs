@@ -40,9 +40,7 @@ public class SyncSettings
     public int ImagePullIntervalMs => ImagePullIntervalSeconds * 1000;
 
     private static string SettingsPath =>
-        Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "BiSheng", "Latte", "sync.json");
+        Path.Combine(Services.LatteAppPaths.Root, "sync.json");
 
     /// <summary>从磁盘加载；文件不存在或损坏时返回默认值</summary>
     public static SyncSettings Load()

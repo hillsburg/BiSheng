@@ -51,9 +51,7 @@ public class DataSafetySettings
     public DateTime? LastFullExportUtc { get; set; }
 
     private static string SettingsPath =>
-        Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "BiSheng", "Latte", "data-safety.json");
+        Path.Combine(Services.LatteAppPaths.Root, "data-safety.json");
 
     public static DataSafetySettings Load()
     {

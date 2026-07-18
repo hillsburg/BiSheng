@@ -9,9 +9,8 @@ namespace BiSheng.Latte.Models;
 public static class ThemeManager
 {
     /// <summary>用户主题存储目录</summary>
-    private static readonly string UserThemesDir = Path.Combine(
-        Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-        "BiSheng", "Latte", "themes");
+    private static string UserThemesDir =>
+        Path.Combine(Services.LatteAppPaths.Root, "themes");
 
     /// <summary>
     /// 获取所有内置预设
