@@ -10,3 +10,5 @@
 | `litestream.yml.example` | 可选 Litestream 连续复制（仅 DB；uploads 另备） |
 
 依赖：`sqlite3`、`tar`、`bash`。
+
+应用升级（停服替换程序文件）见同级目录 [`../server-upgrade/`](../server-upgrade/)。
