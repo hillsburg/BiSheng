@@ -1,6 +1,6 @@
 <Project>
-  <!-- 统一客户端发版版本；Velopack pack 与程序内展示共用 -->
+  <!-- Latte 与 Server 共用产品版本；GitHub Release tag 建议 v$(BiShengVersion) -->
   <PropertyGroup>
-    <BiShengLatteVersion>0.1.0</BiShengLatteVersion>
+    <BiShengVersion>0.1.0</BiShengVersion>
   </PropertyGroup>
 </Project>
