@@ -1,6 +1,6 @@
 # BiSheng (Latte)
 
-[![CI](https://github.com/hillsburg/BiSheng-OSS/actions/workflows/ci.yml/badge.svg)](https://github.com/hillsburg/BiSheng-OSS/actions/workflows/ci.yml)
+[![CI](https://github.com/hillsburg/BiSheng/actions/workflows/ci.yml/badge.svg)](https://github.com/hillsburg/BiSheng/actions/workflows/ci.yml)
 [![License: MIT](https://img.shields.io/badge/License-MIT-blue.svg)](LICENSE)
 [![.NET](https://img.shields.io/badge/.NET-8.0-512BD4)](https://dotnet.microsoft.com/)
 [![Platform](https://img.shields.io/badge/Platform-Windows-0078D6)](https://www.microsoft.com/windows)
@@ -65,8 +65,8 @@ _Screenshots coming soon._
 ### Clone and build
 
 ```bash
-git clone https://github.com/hillsburg/BiSheng-OSS.git
-cd BiSheng-OSS
+git clone https://github.com/hillsburg/BiSheng.git
+cd BiSheng
 
 dotnet build Bisheng.slnx -c Release
 ```
