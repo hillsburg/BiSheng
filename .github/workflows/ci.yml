@@ -8,6 +8,8 @@ on:
 jobs:
   test:
     runs-on: windows-latest
+    # Latte 正常约 30s；防止 WPF Dispatcher 死锁挂死 runner
+    timeout-minutes: 15
 
     steps:
       - name: Checkout
