@@ -1,0 +1,7 @@
+# 安装示例（root）:
+#   sudo cp scripts/server-backup/backup-bisheng.sh /usr/local/bin/backup-bisheng.sh
+#   sudo chmod +x /usr/local/bin/backup-bisheng.sh
+#   sudo crontab -e
+#
+# 每天 03:15 备份（在线 .backup，无需停服）
+15 3 * * * BISHENG_HOME=/opt/bisheng BACKUP_ROOT=/opt/bisheng/backup RETENTION_DAYS=14 /usr/local/bin/backup-bisheng.sh >> /var/log/bisheng-backup.log 2>&1

@@ -1,0 +1,33 @@
+<Project Sdk="Microsoft.NET.Sdk">
+
+  <PropertyGroup>
+    <!--
+      BiSheng.Shared — 同步协议契约共享库
+
+      设计目的：
+        客户端（BiSheng.Latte）与服务端（BiSheng.Server）通过 HTTP/JSON 进行增量同步，
+        双方必须对“实体类型”和“操作类型”的字符串值保持完全一致。
+        本项目是这两个常量的唯一来源（Single Source of Truth），
+        两端通过 ProjectReference 引用，杜绝因分别维护而导致协议不一致的风险。
+
+      日标框架：
+        netstandard2.0 —— 该库仅含 const string，无任何框架依赖，
+        确保 .NET Framework 4.6.1+ / .NET Core 2.0+ / .NET 5+ 全平台兼容，
+        为未来移动端等第三方客户端预留接入能力。
+
+      扩展原则：
+        新增实体类型或操作类型时，只需修改本项目的 EntityTypes.cs / ChangeActions.cs，
+        客户端和服务端自动获得新常量，编译时即可发现遗漏。
+    -->
+    <TargetFramework>netstandard2.0</TargetFramework>
+    <LangVersion>latest</LangVersion>
+    <Nullable>enable</Nullable>
+    <Description>BiSheng 同步协议契约：实体类型、操作类型与 HTTP/SignalR DTO</Description>
+  </PropertyGroup>
+
+  <ItemGroup>
+    <PackageReference Include="System.ComponentModel.Annotations" Version="5.0.0" />
+    <PackageReference Include="System.Text.Json" Version="8.0.5" />
+  </ItemGroup>
+
+</Project>

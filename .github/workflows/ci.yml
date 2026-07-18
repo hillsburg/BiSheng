@@ -1,0 +1,25 @@
+name: CI
+
+on:
+  push:
+    branches: [main, master]
+  pull_request:
+
+jobs:
+  test:
+    runs-on: windows-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Test Server
+        run: dotnet test tests/BiSheng.Server.Tests/BiSheng.Server.Tests.csproj --configuration Release --verbosity normal
+
+      - name: Test Latte
+        run: dotnet test tests/BiSheng.Latte.Tests/BiSheng.Latte.Tests.csproj --configuration Release --verbosity normal

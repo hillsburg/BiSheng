@@ -1,0 +1,216 @@
+@page "/admin/keys"
+@model KeysModel
+@{
+    ViewData["Title"] = "API Key 管理";
+}
+
+<style>
+    .page-header {
+        margin-bottom: 28px;
+        animation: fadeUp 0.5s ease-out both;
+    }
+
+    .page-title {
+        font-family: var(--font-display);
+        font-size: 28px;
+        font-weight: 400;
+        letter-spacing: -0.03em;
+        margin-bottom: 4px;
+    }
+
+    .page-subtitle {
+        font-size: 14px;
+        color: var(--text-muted);
+    }
+
+    .create-section {
+        background: var(--bg-elevated);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        padding: 32px 36px;
+        margin-bottom: 20px;
+        animation: fadeUp 0.5s ease-out both;
+        animation-delay: 0.05s;
+    }
+
+    .create-section h3 {
+        font-family: var(--font-display);
+        font-size: 16px;
+        font-weight: 500;
+        margin-bottom: 16px;
+    }
+
+    .create-form {
+        display: flex;
+        gap: 12px;
+        align-items: flex-end;
+    }
+
+    .create-form .form-group {
+        flex: 1;
+        margin-bottom: 0;
+    }
+
+    .new-key-alert {
+        background: var(--success-bg);
+        border: 1px solid var(--success-border);
+        border-radius: var(--radius);
+        padding: 16px 20px;
+        margin-bottom: 20px;
+        animation: fadeUp 0.5s ease-out both;
+    }
+
+    .new-key-alert p {
+        font-size: 13px;
+        color: var(--accent);
+        font-weight: 500;
+        margin-bottom: 8px;
+    }
+
+    .list-section {
+        background: var(--bg-elevated);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        overflow: hidden;
+        animation: fadeUp 0.5s ease-out both;
+        animation-delay: 0.1s;
+    }
+
+    .list-header {
+        padding: 20px 24px 0;
+    }
+
+    .list-header h3 {
+        font-family: var(--font-display);
+        font-size: 16px;
+        font-weight: 500;
+    }
+
+    .key-status {
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+        font-size: 12px;
+        font-weight: 500;
+    }
+
+    .key-status-dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+    }
+
+    .key-status-dot.active { background: var(--accent); }
+    .key-status-dot.inactive { background: var(--text-muted); }
+
+    .key-actions {
+        display: flex;
+        gap: 8px;
+    }
+
+    .key-actions form { display: inline; }
+
+    .empty-state {
+        text-align: center;
+        padding: 48px 20px;
+        color: var(--text-muted);
+        font-size: 14px;
+    }
+</style>
+
+<div class="page-header">
+    <h1 class="page-title">API Keys</h1>
+    <p class="page-subtitle">管理客户端连接密钥</p>
+</div>
+
+@if (!string.IsNullOrEmpty(Model.NewKeyValue))
+{
+    <div class="new-key-alert">
+        <p>新 Key 已生成 — 请立即复制保存，此值仅显示一次</p>
+        <div class="key-value">@Model.NewKeyValue</div>
+    </div>
+}
+
+@if (!string.IsNullOrEmpty(Model.ErrorMessage))
+{
+    <div class="alert alert-danger">@Model.ErrorMessage</div>
+}
+
+<div class="create-section">
+    <h3>生成新 Key</h3>
+    <form method="post" asp-page-handler="Create" class="create-form">
+        <div class="form-group">
+            <label>设备名称</label>
+            <input asp-for="NewDeviceName" required placeholder="例如：办公室电脑、手机" />
+        </div>
+        <button type="submit" class="btn btn-primary">生成</button>
+    </form>
+</div>
+
+<div class="list-section">
+    <div class="list-header">
+        <h3>已有的 Key</h3>
+    </div>
+
+    @if (Model.Keys.Any())
+    {
+        <table>
+            <thead>
+                <tr><th>设备名称</th><th>创建时间</th><th>状态</th><th style="text-align:right;">操作</th></tr>
+            </thead>
+            <tbody>
+                @foreach (var key in Model.Keys)
+                {
+                    <tr>
+                        <td style="font-weight:500;">@key.DeviceName</td>
+                        <td style="color:var(--text-muted);font-size:13px;">@key.CreatedAt.ToString("yyyy-MM-dd HH:mm")</td>
+                        <td>
+                            @if (key.IsActive)
+                            {
+                                <span class="key-status">
+                                    <span class="key-status-dot active"></span>
+                                    活跃
+                                </span>
+                            }
+                            else
+                            {
+                                <span class="key-status">
+                                    <span class="key-status-dot inactive"></span>
+                                    已吊销
+                                </span>
+                            }
+                        </td>
+                        <td style="text-align:right;">
+                            <div class="key-actions" style="justify-content:flex-end;">
+                                @if (key.IsActive)
+                                {
+                                    <form method="post" asp-page-handler="Revoke">
+                                        <input type="hidden" name="keyId" value="@key.Id" />
+                                        <button type="submit" class="btn btn-danger btn-sm"
+                                                onclick="return confirm('确定要吊销此 Key 吗？')">
+                                            吊销
+                                        </button>
+                                    </form>
+                                }
+                                else
+                                {
+                                    <form method="post" asp-page-handler="Delete">
+                                        <input type="hidden" name="keyId" value="@key.Id" />
+                                        <button type="submit" class="btn btn-secondary btn-sm"
+                                                onclick="return confirm('确定要永久删除此 Key 吗？')">
+                                            删除
+                                        </button>
+                                    </form>
+                                }
+                            </div>
+                        </td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+    else
+    {
+        <div class="empty-state">暂无 API Key</div>
+    }
+</div>

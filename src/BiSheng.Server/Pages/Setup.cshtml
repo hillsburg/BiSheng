@@ -1,0 +1,181 @@
+@page "/admin/setup"
+@model SetupModel
+@{
+    Layout = "_Layout";
+    ViewData["Title"] = "初始化设置";
+}
+
+<style>
+    .setup-wrapper {
+        min-height: calc(100vh - 180px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .setup-card {
+        width: 100%;
+        max-width: 440px;
+        background: var(--bg-elevated);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        padding: 44px 40px;
+        animation: fadeUp 0.6s ease-out both;
+        animation-delay: 0.1s;
+    }
+
+    .setup-brand {
+        font-family: var(--font-display);
+        font-size: 28px;
+        font-weight: 400;
+        letter-spacing: -0.03em;
+        color: var(--text);
+        margin-bottom: 6px;
+    }
+
+    .setup-subtitle {
+        font-size: 14px;
+        color: var(--text-muted);
+        margin-bottom: 32px;
+        line-height: 1.5;
+    }
+
+    .setup-card .btn-primary {
+        width: 100%;
+        padding: 11px 20px;
+        margin-top: 8px;
+    }
+
+    .setup-step {
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        width: 28px;
+        height: 28px;
+        border-radius: 50%;
+        background: var(--accent-light);
+        color: var(--accent);
+        font-size: 13px;
+        font-weight: 600;
+        margin-right: 10px;
+    }
+
+    .setup-footer {
+        margin-top: 28px;
+        padding-top: 20px;
+        border-top: 1px solid var(--border);
+        font-size: 13px;
+        color: var(--text-muted);
+        line-height: 1.5;
+    }
+
+    /* TOTP 二维码区域 */
+    .totp-section {
+        text-align: center;
+        margin: 20px 0 28px;
+        padding: 24px;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-md);
+    }
+
+    .totp-section img {
+        display: block;
+        margin: 0 auto 16px;
+        border-radius: 8px;
+        background: #fff;
+        padding: 8px;
+    }
+
+    .totp-secret-text {
+        font-family: var(--font-mono);
+        font-size: 12px;
+        color: var(--text-muted);
+        word-break: break-all;
+        margin-top: 8px;
+        user-select: all;
+        cursor: pointer;
+    }
+
+    .totp-secret-text::before {
+        content: "或手动输入：";
+        display: block;
+        font-family: var(--font-body);
+        font-size: 12px;
+        color: var(--text-muted);
+        margin-bottom: 6px;
+    }
+</style>
+
+<div class="setup-wrapper">
+    <div class="setup-card">
+        @if (Model.IsVerifyStep)
+        {
+            <!-- 第二步：TOTP 验证 -->
+            <h1 class="setup-brand"><span class="setup-step">2</span>绑定验证器</h1>
+            <p class="setup-subtitle">使用 Google Authenticator 或其他 TOTP App 扫描下方二维码，然后输入显示的 6 位验证码完成设置。</p>
+
+            @if (!string.IsNullOrEmpty(Model.ErrorMessage))
+            {
+                <div class="alert alert-danger">@Model.ErrorMessage</div>
+            }
+
+            <div class="totp-section">
+                <img src="@Model.QrCodeUrl" alt="TOTP QR Code" width="200" height="200" />
+                <div class="totp-secret-text" title="点击可选中复制">@Model.DisplayTotpSecret</div>
+            </div>
+
+            <form method="post">
+                @Html.AntiForgeryToken()
+                <div class="form-group">
+                    <label>验证码</label>
+                    <input asp-for="TotpCode" required autofocus maxlength="6" pattern="[0-9]{6}"
+                           placeholder="输入 App 显示的 6 位数字"
+                           autocomplete="off" inputmode="numeric"
+                           style="font-family: var(--font-mono); font-size: 18px; letter-spacing: 0.3em; text-align: center;" />
+                </div>
+                <button type="submit" class="btn btn-primary">验证并完成设置</button>
+            </form>
+
+            <div style="text-align:center; margin-top: 16px;">
+                <a href="/admin/setup?reset=1" style="font-size:13px; color:var(--text-muted); text-decoration:none;">&larr; 返回上一步</a>
+            </div>
+        }
+        else
+        {
+            <!-- 第一步：创建管理员 -->
+            <h1 class="setup-brand"><span class="setup-step">1</span>初始化</h1>
+            <p class="setup-subtitle">首次启动，请创建管理员账户。此账户是服务端唯一的管理凭证。</p>
+
+            @if (!string.IsNullOrEmpty(Model.ErrorMessage))
+            {
+                <div class="alert alert-danger">@Model.ErrorMessage</div>
+            }
+
+            <form method="post">
+                @Html.AntiForgeryToken()
+                <div class="form-group">
+                    <label>管理员用户名</label>
+                    <input asp-for="Username" required minlength="3" maxlength="64" placeholder="例如：admin" />
+                </div>
+                <div class="form-group">
+                    <label>密码</label>
+                    <input asp-for="Password" type="password" required minlength="6" placeholder="至少 6 个字符" />
+                </div>
+                <div class="form-group">
+                    <label>确认密码</label>
+                    <input asp-for="ConfirmPassword" type="password" required placeholder="再次输入密码" />
+                </div>
+                <div class="form-group">
+                    <label>首个设备名称 <span style="color:var(--text-muted);font-weight:400;">（可选）</span></label>
+                    <input asp-for="DeviceName" placeholder="例如：办公室电脑" />
+                </div>
+                <button type="submit" class="btn btn-primary">下一步 — 绑定验证器</button>
+            </form>
+
+            <div class="setup-footer">
+                完成设置后，系统将自动生成首个 API Key，用于客户端连接。
+            </div>
+        }
+    </div>
+</div>

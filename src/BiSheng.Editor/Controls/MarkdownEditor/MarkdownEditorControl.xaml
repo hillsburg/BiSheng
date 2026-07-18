@@ -1,0 +1,33 @@
+﻿<UserControl
+    x:Class="BiSheng.Editor.Controls.MarkdownEditor.MarkdownEditorControl"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:avalonedit="http://icsharpcode.net/sharpdevelop/avalonedit"
+    Background="{Binding RelativeSource={RelativeSource Self}, Path=Theme.BackgroundColor}">
+
+    <!--
+        Markdown 编辑器主控件。
+        
+        行号布局架构：
+        - 行号通过 AvalonEdit 内置的 ShowLineNumbers 属性显示在右侧（RightMargins）
+        - 右侧边栏视觉顺序：[文本内容] | [分割虚线] [行号]
+        - 左侧边栏：HeadingMargin（标题级别标签，如 H1、H2）通过 LeftMargins 添加
+        
+        Padding 说明：
+        - 左侧 150px：为 HeadingMargin 和文档起始留出空间
+        - 右侧 220px：为右侧行号边栏 + 额外边距，确保文本视觉居中
+        - 上下 80px：文档顶部和底部的呼吸空间
+    -->
+    <avalonedit:TextEditor
+        x:Name="Editor"
+        Padding="150,80,50,80"
+        Background="Transparent"
+        BorderThickness="0"
+        FontFamily="Segoe UI, Microsoft YaHei"
+        FontSize="14"
+        Foreground="#333333"
+        HorizontalScrollBarVisibility="Disabled"
+        ShowLineNumbers="True"
+        VerticalScrollBarVisibility="Auto"
+        WordWrap="True" />
+</UserControl>

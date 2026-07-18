@@ -1,0 +1,697 @@
+<Window x:Class="BiSheng.Latte.Views.AppearanceSettingsWindow"
+        xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+        xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+        xmlns:ctrl="clr-namespace:BiSheng.Latte.Controls"
+        Title="外观与样式设置"
+        Height="640" Width="560" MinHeight="500" MinWidth="500"
+        WindowStartupLocation="CenterOwner"
+        ResizeMode="CanResize"
+        Background="{DynamicResource Brush.BgCanvas}">
+
+    <Window.Resources>
+        <!-- 外观窗口特有资源已迁移至 WindowChromeStyles.xaml -->
+    </Window.Resources>
+
+    <DockPanel>
+        <!-- 底部按钮栏 -->
+        <Border DockPanel.Dock="Bottom" Style="{StaticResource WindowFooterBorder}">
+            <StackPanel Margin="-8,0,0,0" HorizontalAlignment="Right" Orientation="Horizontal">
+                <Button
+                    Click="OnExport"
+                    Content="导出..."
+                    Style="{StaticResource DialogButtonSecondary}" />
+                <Button
+                    Click="OnImport"
+                    Content="导入..."
+                    Style="{StaticResource DialogButtonSecondary}" />
+                <Button
+                    Click="OnCancel"
+                    Content="取消"
+                    IsCancel="True"
+                    Style="{StaticResource DialogButtonNeutral}" />
+                <Button
+                    Click="OnApply"
+                    Content="应用"
+                    Style="{StaticResource DialogButtonSecondary}" />
+                <Button
+                    Click="OnSave"
+                    Content="保存"
+                    IsDefault="True"
+                    Style="{StaticResource DialogButtonPrimary}" />
+            </StackPanel>
+        </Border>
+
+        <!-- 主内容区 -->
+        <TabControl Padding="0" BorderThickness="0" Background="Transparent"
+                    FontFamily="{StaticResource UIFont}" FontSize="13">
+            <!-- 样式 Tab -->
+            <TabItem Header="样式">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="28,20">
+                    <StackPanel x:Name="MainPanel">
+
+                <!-- ===== 主题选择 ===== -->
+                <TextBlock Text="主题" Foreground="{DynamicResource Brush.Text}"
+                           FontSize="15" FontWeight="SemiBold" Margin="0,0,0,6"/>
+                <TextBlock Text="选择预设或创建自定义主题，控制全局界面和编辑器的完整配色"
+                           Foreground="{DynamicResource Brush.TextMuted}"
+                           FontSize="12" Margin="0,0,0,10"/>
+
+                <DockPanel Margin="0,0,0,12">
+                    <Button x:Name="CreateCustomBtn" Content="复制并自定义"
+                            DockPanel.Dock="Right" Margin="8,0,0,0" Padding="12,0"
+                            Height="32" FontSize="12" FontWeight="SemiBold"
+                            Style="{StaticResource DialogButtonSecondary}"
+                            Click="OnCreateCustom"/>
+                    <ComboBox x:Name="ThemeBox" Height="32" FontSize="13"
+                              SelectionChanged="OnThemeSelectionChanged"/>
+                </DockPanel>
+
+                <!-- 主题名称（仅自定义主题可编辑） -->
+                <DockPanel x:Name="CustomNamePanel" Margin="0,0,0,12" Visibility="Collapsed">
+                    <TextBlock Text="主题名:" FontSize="12"
+                               Foreground="{DynamicResource Brush.TextSecondary}"
+                               VerticalAlignment="Center" Margin="0,0,8,0"/>
+                    <Button x:Name="DeleteThemeBtn" Content="删除" DockPanel.Dock="Right"
+                            Margin="8,0,0,0" Padding="10,0" Height="26" FontSize="11"
+                            Style="{StaticResource DialogButtonDanger}"
+                            Click="OnDeleteTheme"/>
+                    <TextBox x:Name="ThemeNameBox" FontSize="13" Padding="6,4"
+                             TextChanged="OnThemeNameChanged"/>
+                </DockPanel>
+
+                <!-- ===== 界面配色 (Expander) ===== -->
+                <Expander x:Name="GlobalColorsExpander" Header="界面配色" IsExpanded="False"
+                          Visibility="Collapsed" Margin="0,0,0,8"
+                          Foreground="{DynamicResource Brush.Text}"
+                          FontFamily="{StaticResource UIFont}" FontSize="14"
+                          FontWeight="SemiBold">
+                    <StackPanel x:Name="GlobalColorPanel" Margin="8,12,0,8"/>
+                </Expander>
+
+                <!-- ===== 编辑器配色 (Expander) ===== -->
+                <Expander x:Name="EditorColorsExpander" Header="编辑器配色" IsExpanded="False"
+                          Visibility="Collapsed" Margin="0,0,0,16"
+                          Foreground="{DynamicResource Brush.Text}"
+                          FontFamily="{StaticResource UIFont}" FontSize="14"
+                          FontWeight="SemiBold">
+                    <StackPanel x:Name="EditorColorPanel" Margin="8,12,0,8"/>
+                </Expander>
+
+                <!-- 分割线 -->
+                <Border Height="1" Background="{DynamicResource Brush.BorderLight}"
+                        Margin="0,0,0,20"/>
+
+                <!-- ===== 编辑器字体（按主题分别保存） ===== -->
+                <TextBlock Text="编辑器字体" Style="{StaticResource SettingLabel}" Margin="0,0,0,6"/>
+                <TextBlock x:Name="FontThemeHint"
+                           Foreground="{DynamicResource Brush.TextMuted}"
+                           FontSize="12" Margin="0,0,0,8"
+                           TextWrapping="Wrap"
+                           Text="为当前主题设置编辑器字体；切换主题时选项会跟着变化"/>
+                <ComboBox x:Name="FontFamilyBox" Height="32" FontSize="13"
+                          Margin="0,0,0,6"
+                          SelectionChanged="OnFontFamilySelectionChanged"/>
+                <TextBlock x:Name="FontAvailabilityHint"
+                           Foreground="{DynamicResource Brush.Danger}"
+                           FontSize="12" Margin="0,0,0,20"
+                           TextWrapping="Wrap" Visibility="Collapsed"/>
+
+                <!-- ===== 行间距 ===== -->
+                <TextBlock Text="行间距" Style="{StaticResource SettingLabel}" Margin="0,0,0,6"/>
+                <DockPanel Margin="0,0,0,16">
+                    <TextBlock x:Name="LineSpacingValue" Style="{StaticResource ValueDisplay}"
+                               DockPanel.Dock="Right"/>
+                    <Slider x:Name="LineSpacingSlider" Minimum="1.0" Maximum="2.5"
+                            TickFrequency="0.1" IsSnapToTickEnabled="True"
+                            VerticalAlignment="Center" Margin="0,0,12,0"
+                            ValueChanged="OnLineSpacingChanged"/>
+                </DockPanel>
+
+                <!-- ===== 正文字号 ===== -->
+                <TextBlock Text="正文字号" Style="{StaticResource SettingLabel}" Margin="0,0,0,6"/>
+                <DockPanel Margin="0,0,0,20">
+                    <TextBlock x:Name="BodySizeValue" Style="{StaticResource ValueDisplay}"
+                               DockPanel.Dock="Right"/>
+                    <Slider x:Name="BodySizeSlider" Minimum="12" Maximum="24"
+                            TickFrequency="1" IsSnapToTickEnabled="True"
+                            VerticalAlignment="Center" Margin="0,0,12,0"
+                            ValueChanged="OnBodySizeChanged"/>
+                </DockPanel>
+
+                <!-- 分割线 -->
+                <Border Height="1" Background="{DynamicResource Brush.BorderLight}"
+                        Margin="0,4,0,20"/>
+
+                <TextBlock Text="标题字号" Foreground="{DynamicResource Brush.Text}"
+                           FontSize="14" FontWeight="SemiBold" Margin="0,0,0,14"/>
+
+                <!-- 一级标题 -->
+                <TextBlock Text="一级标题 (H1)" Style="{StaticResource SettingLabel}" Margin="0,0,0,6"/>
+                <DockPanel Margin="0,0,0,16">
+                    <TextBlock x:Name="H1SizeValue" Style="{StaticResource ValueDisplay}"
+                               DockPanel.Dock="Right"/>
+                    <Slider x:Name="H1SizeSlider" Minimum="20" Maximum="48"
+                            TickFrequency="1" IsSnapToTickEnabled="True"
+                            VerticalAlignment="Center" Margin="0,0,12,0"
+                            ValueChanged="OnH1Changed"/>
+                </DockPanel>
+
+                <!-- 二级标题 -->
+                <TextBlock Text="二级标题 (H2)" Style="{StaticResource SettingLabel}" Margin="0,0,0,6"/>
+                <DockPanel Margin="0,0,0,16">
+                    <TextBlock x:Name="H2SizeValue" Style="{StaticResource ValueDisplay}"
+                               DockPanel.Dock="Right"/>
+                    <Slider x:Name="H2SizeSlider" Minimum="16" Maximum="40"
+                            TickFrequency="1" IsSnapToTickEnabled="True"
+                            VerticalAlignment="Center" Margin="0,0,12,0"
+                            ValueChanged="OnH2Changed"/>
+                </DockPanel>
+
+                <!-- 三级标题 -->
+                <TextBlock Text="三级标题 (H3)" Style="{StaticResource SettingLabel}" Margin="0,0,0,6"/>
+                <DockPanel Margin="0,0,0,16">
+                    <TextBlock x:Name="H3SizeValue" Style="{StaticResource ValueDisplay}"
+                               DockPanel.Dock="Right"/>
+                    <Slider x:Name="H3SizeSlider" Minimum="14" Maximum="36"
+                            TickFrequency="1" IsSnapToTickEnabled="True"
+                            VerticalAlignment="Center" Margin="0,0,12,0"
+                            ValueChanged="OnH3Changed"/>
+                </DockPanel>
+
+                <!-- 四级标题 -->
+                <TextBlock Text="四级标题 (H4)" Style="{StaticResource SettingLabel}" Margin="0,0,0,6"/>
+                <DockPanel Margin="0,0,0,16">
+                    <TextBlock x:Name="H4SizeValue" Style="{StaticResource ValueDisplay}"
+                               DockPanel.Dock="Right"/>
+                    <Slider x:Name="H4SizeSlider" Minimum="12" Maximum="28"
+                            TickFrequency="1" IsSnapToTickEnabled="True"
+                            VerticalAlignment="Center" Margin="0,0,12,0"
+                            ValueChanged="OnH4Changed"/>
+                </DockPanel>
+
+                <!-- 五级标题 -->
+                <TextBlock Text="五级标题 (H5)" Style="{StaticResource SettingLabel}" Margin="0,0,0,6"/>
+                <DockPanel Margin="0,0,0,16">
+                    <TextBlock x:Name="H5SizeValue" Style="{StaticResource ValueDisplay}"
+                               DockPanel.Dock="Right"/>
+                    <Slider x:Name="H5SizeSlider" Minimum="12" Maximum="24"
+                            TickFrequency="1" IsSnapToTickEnabled="True"
+                            VerticalAlignment="Center" Margin="0,0,12,0"
+                            ValueChanged="OnH5Changed"/>
+                </DockPanel>
+
+                <!-- 六级标题 -->
+                <TextBlock Text="六级标题 (H6)" Style="{StaticResource SettingLabel}" Margin="0,0,0,6"/>
+                <DockPanel Margin="0,0,0,16">
+                    <TextBlock x:Name="H6SizeValue" Style="{StaticResource ValueDisplay}"
+                               DockPanel.Dock="Right"/>
+                    <Slider x:Name="H6SizeSlider" Minimum="12" Maximum="20"
+                            TickFrequency="1" IsSnapToTickEnabled="True"
+                            VerticalAlignment="Center" Margin="0,0,12,0"
+                            ValueChanged="OnH6Changed"/>
+                </DockPanel>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+
+            <!-- 布局 Tab -->
+            <TabItem Header="布局">
+                <ScrollViewer VerticalScrollBarVisibility="Auto" Padding="28,20">
+                    <StackPanel>
+                        <TextBlock Text="导航区布局" Foreground="{DynamicResource Brush.Text}"
+                                   FontSize="15" FontWeight="SemiBold" Margin="0,0,0,6"/>
+                        <TextBlock Text="选择文件夹与笔记的展示方式"
+                                   Foreground="{DynamicResource Brush.TextMuted}"
+                                   FontSize="12" Margin="0,0,0,16"/>
+
+                        <!-- 并列模式卡片 -->
+                        <Border x:Name="SideBySideCard" BorderThickness="2" CornerRadius="8"
+                                Padding="16" Margin="0,0,0,12" Cursor="Hand"
+                                MouseLeftButtonDown="OnSideBySideSelected"
+                                BorderBrush="{DynamicResource Brush.Accent}"
+                                Background="{DynamicResource Brush.Surface}">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="110"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <!-- 示意图 -->
+                                <Border Grid.Column="0" Height="64" CornerRadius="4"
+                                        Background="{DynamicResource Brush.SurfaceAlt}"
+                                        BorderBrush="{DynamicResource Brush.BorderLight}"
+                                        BorderThickness="1" Margin="0,0,16,0">
+                                    <Grid Margin="6">
+                                        <Grid.ColumnDefinitions>
+                                            <ColumnDefinition Width="*"/>
+                                            <ColumnDefinition Width="3"/>
+                                            <ColumnDefinition Width="*"/>
+                                        </Grid.ColumnDefinitions>
+                                        <Border Grid.Column="0" Background="{DynamicResource Brush.Accent}"
+                                                Opacity="0.25" CornerRadius="2"/>
+                                        <Border Grid.Column="1" Background="{DynamicResource Brush.Border}"
+                                                CornerRadius="1"/>
+                                        <Border Grid.Column="2" Background="{DynamicResource Brush.Accent}"
+                                                Opacity="0.15" CornerRadius="2"/>
+                                    </Grid>
+                                </Border>
+                                <!-- 文字说明 -->
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                    <TextBlock Text="左右并列" FontSize="14" FontWeight="SemiBold"
+                                               Foreground="{DynamicResource Brush.Text}"/>
+                                    <TextBlock Text="文件夹树与笔记列表分列并排展示"
+                                               FontSize="12" Margin="0,4,0,0"
+                                               Foreground="{DynamicResource Brush.TextSecondary}"
+                                               TextWrapping="Wrap"/>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+
+                        <!-- 归纳模式卡片 -->
+                        <Border x:Name="TreeViewCard" BorderThickness="2" CornerRadius="8"
+                                Padding="16" Margin="0,0,0,12" Cursor="Hand"
+                                MouseLeftButtonDown="OnTreeViewSelected"
+                                BorderBrush="{DynamicResource Brush.BorderLight}"
+                                Background="{DynamicResource Brush.Surface}">
+                            <Grid>
+                                <Grid.ColumnDefinitions>
+                                    <ColumnDefinition Width="110"/>
+                                    <ColumnDefinition Width="*"/>
+                                </Grid.ColumnDefinitions>
+                                <!-- 示意图 -->
+                                <Border Grid.Column="0" Height="64" CornerRadius="4"
+                                        Background="{DynamicResource Brush.SurfaceAlt}"
+                                        BorderBrush="{DynamicResource Brush.BorderLight}"
+                                        BorderThickness="1" Margin="0,0,16,0">
+                                    <StackPanel Margin="8,6">
+                                        <StackPanel Orientation="Horizontal" Margin="0,2">
+                                            <TextBlock Text="📁" FontSize="10" Margin="0,0,4,0"/>
+                                            <Border Background="{DynamicResource Brush.Accent}"
+                                                    Opacity="0.25" Height="8" Width="40"
+                                                    CornerRadius="2"/>
+                                        </StackPanel>
+                                        <StackPanel Orientation="Horizontal" Margin="12,2">
+                                            <TextBlock Text="📄" FontSize="10" Margin="0,0,4,0"/>
+                                            <Border Background="{DynamicResource Brush.Accent}"
+                                                    Opacity="0.15" Height="8" Width="32"
+                                                    CornerRadius="2"/>
+                                        </StackPanel>
+                                        <StackPanel Orientation="Horizontal" Margin="12,2">
+                                            <TextBlock Text="📄" FontSize="10" Margin="0,0,4,0"/>
+                                            <Border Background="{DynamicResource Brush.Accent}"
+                                                    Opacity="0.15" Height="8" Width="36"
+                                                    CornerRadius="2"/>
+                                        </StackPanel>
+                                        <StackPanel Orientation="Horizontal" Margin="0,2">
+                                            <TextBlock Text="📁" FontSize="10" Margin="0,0,4,0"/>
+                                            <Border Background="{DynamicResource Brush.Accent}"
+                                                    Opacity="0.25" Height="8" Width="36"
+                                                    CornerRadius="2"/>
+                                        </StackPanel>
+                                    </StackPanel>
+                                </Border>
+                                <!-- 文字说明 -->
+                                <StackPanel Grid.Column="1" VerticalAlignment="Center">
+                                    <TextBlock Text="树形归纳" FontSize="14" FontWeight="SemiBold"
+                                               Foreground="{DynamicResource Brush.Text}"/>
+                                    <TextBlock Text="笔记作为叶节点归纳到文件夹树中"
+                                               FontSize="12" Margin="0,4,0,0"
+                                               Foreground="{DynamicResource Brush.TextSecondary}"
+                                               TextWrapping="Wrap"/>
+                                </StackPanel>
+                            </Grid>
+                        </Border>
+
+                        <TextBlock
+                            Margin="0,8,0,6"
+                            FontSize="15"
+                            FontWeight="SemiBold"
+                            Foreground="{DynamicResource Brush.Text}"
+                            Text="工具栏" />
+                        <TextBlock
+                            Margin="0,0,0,12"
+                            FontSize="12"
+                            Foreground="{DynamicResource Brush.TextMuted}"
+                            Text="位置与显示方式，上方选位置、下方选显示" />
+
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+                            <Grid.RowDefinitions>
+                                <RowDefinition Height="Auto" />
+                                <RowDefinition Height="Auto" />
+                            </Grid.RowDefinitions>
+
+                            <!-- 顶部横条 -->
+                            <Border
+                                x:Name="ToolbarTopCard"
+                                Grid.Row="0"
+                                Grid.Column="0"
+                                Margin="0,0,4,4"
+                                Padding="10"
+                                Background="{DynamicResource Brush.Surface}"
+                                BorderBrush="{DynamicResource Brush.Accent}"
+                                BorderThickness="2"
+                                CornerRadius="8"
+                                Cursor="Hand"
+                                MouseLeftButtonDown="OnToolbarTopSelected">
+                                <StackPanel HorizontalAlignment="Center">
+                                    <Border
+                                        Width="88"
+                                        Height="40"
+                                        Background="{DynamicResource Brush.SurfaceAlt}"
+                                        BorderBrush="{DynamicResource Brush.BorderLight}"
+                                        BorderThickness="1"
+                                        CornerRadius="4">
+                                        <Grid Margin="5">
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="8" />
+                                                <RowDefinition Height="*" />
+                                            </Grid.RowDefinitions>
+                                            <Border
+                                                Grid.Row="0"
+                                                Background="{DynamicResource Brush.Accent}"
+                                                CornerRadius="2"
+                                                Opacity="0.35" />
+                                            <Border
+                                                Grid.Row="1"
+                                                Margin="0,3,0,0"
+                                                Background="{DynamicResource Brush.Accent}"
+                                                CornerRadius="2"
+                                                Opacity="0.12" />
+                                        </Grid>
+                                    </Border>
+                                    <TextBlock
+                                        Margin="0,6,0,0"
+                                        HorizontalAlignment="Center"
+                                        FontSize="13"
+                                        FontWeight="SemiBold"
+                                        Foreground="{DynamicResource Brush.Text}"
+                                        Text="顶部横条" />
+                                    <TextBlock
+                                        Margin="0,2,0,0"
+                                        HorizontalAlignment="Center"
+                                        FontSize="11"
+                                        Foreground="{DynamicResource Brush.TextSecondary}"
+                                        Text="宽屏横条"
+                                        TextAlignment="Center"
+                                        TextWrapping="Wrap" />
+                                </StackPanel>
+                            </Border>
+
+                            <!-- 导航左侧 -->
+                            <Border
+                                x:Name="ToolbarNavLeftCard"
+                                Grid.Row="0"
+                                Grid.Column="1"
+                                Margin="4,0,0,4"
+                                Padding="10"
+                                Background="{DynamicResource Brush.Surface}"
+                                BorderBrush="{DynamicResource Brush.BorderLight}"
+                                BorderThickness="2"
+                                CornerRadius="8"
+                                Cursor="Hand"
+                                MouseLeftButtonDown="OnToolbarNavLeftSelected">
+                                <StackPanel HorizontalAlignment="Center">
+                                    <Border
+                                        Width="88"
+                                        Height="40"
+                                        Background="{DynamicResource Brush.SurfaceAlt}"
+                                        BorderBrush="{DynamicResource Brush.BorderLight}"
+                                        BorderThickness="1"
+                                        CornerRadius="4">
+                                        <Grid Margin="5">
+                                            <Grid.ColumnDefinitions>
+                                                <ColumnDefinition Width="8" />
+                                                <ColumnDefinition Width="*" />
+                                            </Grid.ColumnDefinitions>
+                                            <Border
+                                                Grid.Column="0"
+                                                Background="{DynamicResource Brush.Accent}"
+                                                CornerRadius="2"
+                                                Opacity="0.35" />
+                                            <Border
+                                                Grid.Column="1"
+                                                Margin="3,0,0,0"
+                                                Background="{DynamicResource Brush.Accent}"
+                                                CornerRadius="2"
+                                                Opacity="0.12" />
+                                        </Grid>
+                                    </Border>
+                                    <TextBlock
+                                        Margin="0,6,0,0"
+                                        HorizontalAlignment="Center"
+                                        FontSize="13"
+                                        FontWeight="SemiBold"
+                                        Foreground="{DynamicResource Brush.Text}"
+                                        Text="导航左侧" />
+                                    <TextBlock
+                                        Margin="0,2,0,0"
+                                        HorizontalAlignment="Center"
+                                        FontSize="11"
+                                        Foreground="{DynamicResource Brush.TextSecondary}"
+                                        Text="纵向竖条"
+                                        TextAlignment="Center"
+                                        TextWrapping="Wrap" />
+                                </StackPanel>
+                            </Border>
+
+                            <!-- 固定显示 -->
+                            <Border
+                                x:Name="ToolbarFixedCard"
+                                Grid.Row="1"
+                                Grid.Column="0"
+                                Margin="0,4,4,0"
+                                Padding="10"
+                                Background="{DynamicResource Brush.Surface}"
+                                BorderBrush="{DynamicResource Brush.BorderLight}"
+                                BorderThickness="2"
+                                CornerRadius="8"
+                                Cursor="Hand"
+                                MouseLeftButtonDown="OnToolbarFixedSelected">
+                                <StackPanel HorizontalAlignment="Center">
+                                    <Border
+                                        Width="88"
+                                        Height="40"
+                                        Background="{DynamicResource Brush.SurfaceAlt}"
+                                        BorderBrush="{DynamicResource Brush.BorderLight}"
+                                        BorderThickness="1"
+                                        CornerRadius="4">
+                                        <Grid Margin="5">
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="8" />
+                                                <RowDefinition Height="*" />
+                                            </Grid.RowDefinitions>
+                                            <Border
+                                                Grid.Row="0"
+                                                Background="{DynamicResource Brush.Accent}"
+                                                CornerRadius="2"
+                                                Opacity="0.55" />
+                                            <Border
+                                                Grid.Row="1"
+                                                Margin="0,3,0,0"
+                                                Background="{DynamicResource Brush.Accent}"
+                                                CornerRadius="2"
+                                                Opacity="0.12" />
+                                        </Grid>
+                                    </Border>
+                                    <TextBlock
+                                        Margin="0,6,0,0"
+                                        HorizontalAlignment="Center"
+                                        FontSize="13"
+                                        FontWeight="SemiBold"
+                                        Foreground="{DynamicResource Brush.Text}"
+                                        Text="固定显示" />
+                                    <TextBlock
+                                        Margin="0,2,0,0"
+                                        HorizontalAlignment="Center"
+                                        FontSize="11"
+                                        Foreground="{DynamicResource Brush.TextSecondary}"
+                                        Text="始终可见"
+                                        TextAlignment="Center"
+                                        TextWrapping="Wrap" />
+                                </StackPanel>
+                            </Border>
+
+                            <!-- 悬停淡入淡出 -->
+                            <Border
+                                x:Name="ToolbarAutoHideCard"
+                                Grid.Row="1"
+                                Grid.Column="1"
+                                Margin="4,4,0,0"
+                                Padding="10"
+                                Background="{DynamicResource Brush.Surface}"
+                                BorderBrush="{DynamicResource Brush.Accent}"
+                                BorderThickness="2"
+                                CornerRadius="8"
+                                Cursor="Hand"
+                                MouseLeftButtonDown="OnToolbarAutoHideSelected">
+                                <StackPanel HorizontalAlignment="Center">
+                                    <Border
+                                        Width="88"
+                                        Height="40"
+                                        Background="{DynamicResource Brush.SurfaceAlt}"
+                                        BorderBrush="{DynamicResource Brush.BorderLight}"
+                                        BorderThickness="1"
+                                        CornerRadius="4">
+                                        <Grid Margin="5">
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="8" />
+                                                <RowDefinition Height="*" />
+                                            </Grid.RowDefinitions>
+                                            <Border
+                                                Grid.Row="0"
+                                                Background="{DynamicResource Brush.Accent}"
+                                                CornerRadius="2"
+                                                Opacity="0.15" />
+                                            <Border
+                                                Grid.Row="1"
+                                                Margin="0,3,0,0"
+                                                Background="{DynamicResource Brush.Accent}"
+                                                CornerRadius="2"
+                                                Opacity="0.12" />
+                                        </Grid>
+                                    </Border>
+                                    <TextBlock
+                                        Margin="0,6,0,0"
+                                        HorizontalAlignment="Center"
+                                        FontSize="13"
+                                        FontWeight="SemiBold"
+                                        Foreground="{DynamicResource Brush.Text}"
+                                        Text="悬停淡入淡出" />
+                                    <TextBlock
+                                        Margin="0,2,0,0"
+                                        HorizontalAlignment="Center"
+                                        FontSize="11"
+                                        Foreground="{DynamicResource Brush.TextSecondary}"
+                                        Text="移入显示"
+                                        TextAlignment="Center"
+                                        TextWrapping="Wrap" />
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+
+                        <TextBlock
+                            Margin="0,20,0,6"
+                            FontSize="15"
+                            FontWeight="SemiBold"
+                            Foreground="{DynamicResource Brush.Text}"
+                            Text="状态栏" />
+                        <TextBlock
+                            Margin="0,0,0,12"
+                            FontSize="12"
+                            Foreground="{DynamicResource Brush.TextMuted}"
+                            Text="底部同步状态栏的显示方式。隐藏后连接状态仍在工具栏徽章中显示。" />
+
+                        <Grid>
+                            <Grid.ColumnDefinitions>
+                                <ColumnDefinition Width="*" />
+                                <ColumnDefinition Width="*" />
+                            </Grid.ColumnDefinitions>
+
+                            <!-- 固定显示 -->
+                            <Border
+                                x:Name="StatusBarFixedCard"
+                                Grid.Column="0"
+                                Margin="0,0,4,0"
+                                Padding="10"
+                                Background="{DynamicResource Brush.Surface}"
+                                BorderBrush="{DynamicResource Brush.Accent}"
+                                BorderThickness="2"
+                                CornerRadius="8"
+                                Cursor="Hand"
+                                MouseLeftButtonDown="OnStatusBarFixedSelected">
+                                <StackPanel HorizontalAlignment="Center">
+                                    <Border
+                                        Width="88"
+                                        Height="40"
+                                        Background="{DynamicResource Brush.SurfaceAlt}"
+                                        BorderBrush="{DynamicResource Brush.BorderLight}"
+                                        BorderThickness="1"
+                                        CornerRadius="4">
+                                        <Grid Margin="5">
+                                            <Grid.RowDefinitions>
+                                                <RowDefinition Height="*" />
+                                                <RowDefinition Height="8" />
+                                            </Grid.RowDefinitions>
+                                            <Border
+                                                Grid.Row="0"
+                                                Background="{DynamicResource Brush.Accent}"
+                                                CornerRadius="2"
+                                                Opacity="0.12" />
+                                            <Border
+                                                Grid.Row="1"
+                                                Background="{DynamicResource Brush.Accent}"
+                                                CornerRadius="2"
+                                                Opacity="0.55" />
+                                        </Grid>
+                                    </Border>
+                                    <TextBlock
+                                        Margin="0,6,0,0"
+                                        HorizontalAlignment="Center"
+                                        FontSize="13"
+                                        FontWeight="SemiBold"
+                                        Foreground="{DynamicResource Brush.Text}"
+                                        Text="固定显示" />
+                                    <TextBlock
+                                        Margin="0,2,0,0"
+                                        HorizontalAlignment="Center"
+                                        FontSize="11"
+                                        Foreground="{DynamicResource Brush.TextSecondary}"
+                                        Text="始终可见"
+                                        TextAlignment="Center"
+                                        TextWrapping="Wrap" />
+                                </StackPanel>
+                            </Border>
+
+                            <!-- 隐藏 -->
+                            <Border
+                                x:Name="StatusBarHiddenCard"
+                                Grid.Column="1"
+                                Margin="4,0,0,0"
+                                Padding="10"
+                                Background="{DynamicResource Brush.Surface}"
+                                BorderBrush="{DynamicResource Brush.BorderLight}"
+                                BorderThickness="2"
+                                CornerRadius="8"
+                                Cursor="Hand"
+                                MouseLeftButtonDown="OnStatusBarHiddenSelected">
+                                <StackPanel HorizontalAlignment="Center">
+                                    <Border
+                                        Width="88"
+                                        Height="40"
+                                        Background="{DynamicResource Brush.SurfaceAlt}"
+                                        BorderBrush="{DynamicResource Brush.BorderLight}"
+                                        BorderThickness="1"
+                                        CornerRadius="4">
+                                        <Border
+                                            Margin="5"
+                                            Background="{DynamicResource Brush.Accent}"
+                                            CornerRadius="2"
+                                            Opacity="0.12" />
+                                    </Border>
+                                    <TextBlock
+                                        Margin="0,6,0,0"
+                                        HorizontalAlignment="Center"
+                                        FontSize="13"
+                                        FontWeight="SemiBold"
+                                        Foreground="{DynamicResource Brush.Text}"
+                                        Text="隐藏" />
+                                    <TextBlock
+                                        Margin="0,2,0,0"
+                                        HorizontalAlignment="Center"
+                                        FontSize="11"
+                                        Foreground="{DynamicResource Brush.TextSecondary}"
+                                        Text="隐藏底栏（连接状态仍在工具栏）"
+                                        TextAlignment="Center"
+                                        TextWrapping="Wrap" />
+                                </StackPanel>
+                            </Border>
+                        </Grid>
+                    </StackPanel>
+                </ScrollViewer>
+            </TabItem>
+        </TabControl>
+    </DockPanel>
+</Window>

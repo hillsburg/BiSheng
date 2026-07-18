@@ -1,0 +1,187 @@
+@page "/admin"
+@model IndexModel
+@{
+    ViewData["Title"] = "仪表盘";
+}
+
+<style>
+    .dashboard-header {
+        margin-bottom: 40px;
+        animation: fadeUp 0.5s ease-out both;
+    }
+
+    .dashboard-greeting {
+        font-family: var(--font-display);
+        font-size: 32px;
+        font-weight: 400;
+        letter-spacing: -0.03em;
+        color: var(--text);
+        margin-bottom: 4px;
+    }
+
+    .dashboard-sub {
+        font-size: 14px;
+        color: var(--text-muted);
+    }
+
+    .stats-grid {
+        display: grid;
+        grid-template-columns: repeat(3, 1fr);
+        gap: 16px;
+        margin-bottom: 32px;
+    }
+
+    .stat-card {
+        background: var(--bg-elevated);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        padding: 24px 28px;
+        transition: all var(--transition);
+        animation: fadeUp 0.5s ease-out both;
+    }
+
+    .stat-card:nth-child(1) { animation-delay: 0.1s; }
+    .stat-card:nth-child(2) { animation-delay: 0.15s; }
+    .stat-card:nth-child(3) { animation-delay: 0.2s; }
+
+    .stat-card:hover {
+        box-shadow: var(--shadow-md);
+        transform: translateY(-2px);
+    }
+
+    .stat-label {
+        font-size: 12px;
+        font-weight: 600;
+        text-transform: uppercase;
+        letter-spacing: 0.06em;
+        color: var(--text-muted);
+        margin-bottom: 8px;
+    }
+
+    .stat-number {
+        font-family: var(--font-display);
+        font-size: 36px;
+        font-weight: 300;
+        letter-spacing: -0.03em;
+        color: var(--text);
+        line-height: 1;
+    }
+
+    .stat-card .stat-link {
+        display: inline-block;
+        margin-top: 14px;
+        font-size: 12.5px;
+        font-weight: 500;
+        color: var(--accent);
+        text-decoration: none;
+        transition: opacity var(--transition);
+    }
+
+    .stat-card .stat-link:hover {
+        opacity: 0.7;
+    }
+
+    .section-card {
+        background: var(--bg-elevated);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        padding: 32px 36px;
+        animation: fadeUp 0.5s ease-out both;
+        animation-delay: 0.25s;
+    }
+
+    .section-header {
+        display: flex;
+        justify-content: space-between;
+        align-items: center;
+        margin-bottom: 20px;
+    }
+
+    .section-title {
+        font-family: var(--font-display);
+        font-size: 18px;
+        font-weight: 500;
+        letter-spacing: -0.01em;
+    }
+
+    .meta-row {
+        display: flex;
+        align-items: center;
+        gap: 24px;
+        padding: 16px 0;
+        border-top: 1px solid var(--border);
+        margin-top: 24px;
+        font-size: 13px;
+        color: var(--text-muted);
+    }
+
+    .meta-label {
+        font-weight: 500;
+        color: var(--text-secondary);
+    }
+
+    @@media (max-width: 640px) {
+        .stats-grid { grid-template-columns: 1fr; }
+        .dashboard-greeting { font-size: 26px; }
+    }
+</style>
+
+<div class="dashboard-header">
+    <h1 class="dashboard-greeting">@Model.AdminUsername</h1>
+    <p class="dashboard-sub">服务器运行状态概览</p>
+</div>
+
+<div class="stats-grid">
+    <div class="stat-card">
+        <div class="stat-label">笔记</div>
+        <div class="stat-number">@Model.NoteCount</div>
+        <a href="/admin/notes" class="stat-link">管理笔记 →</a>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">文件夹</div>
+        <div class="stat-number">@Model.FolderCount</div>
+        <a href="/admin/folders" class="stat-link">管理文件夹 →</a>
+    </div>
+    <div class="stat-card">
+        <div class="stat-label">活跃 Keys</div>
+        <div class="stat-number">@Model.ActiveKeyCount</div>
+        <a href="/admin/keys" class="stat-link">管理 Keys →</a>
+    </div>
+</div>
+
+<div class="section-card">
+    <div class="section-header">
+        <h2 class="section-title">近期 API Key</h2>
+        <a href="/admin/keys" class="btn btn-secondary btn-sm">查看全部</a>
+    </div>
+
+    @if (Model.RecentKeys.Any())
+    {
+        <table>
+            <thead>
+                <tr><th>设备名称</th><th>创建时间</th></tr>
+            </thead>
+            <tbody>
+                @foreach (var key in Model.RecentKeys)
+                {
+                    <tr>
+                        <td style="font-weight:500;">@key.DeviceName</td>
+                        <td style="color:var(--text-muted);font-size:13px;">@key.CreatedAt.ToString("yyyy-MM-dd HH:mm")</td>
+                    </tr>
+                }
+            </tbody>
+        </table>
+    }
+    else
+    {
+        <p style="text-align:center;padding:24px 0;color:var(--text-muted);">暂无活跃的 API Key</p>
+    }
+
+    @if (Model.SetupTime.HasValue)
+    {
+        <div class="meta-row">
+            <span class="meta-label">服务器初始化于</span>
+            <span>@Model.SetupTime.Value.ToString("yyyy-MM-dd HH:mm:ss")</span>
+        </div>
+    }
+</div>

@@ -1,0 +1,104 @@
+<ResourceDictionary
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+
+    <!-- 弹窗圆角按钮基础模板 -->
+    <Style x:Key="DialogButtonBase" TargetType="Button">
+        <Setter Property="FontFamily" Value="{StaticResource UIFont}" />
+        <Setter Property="FontSize" Value="14" />
+        <Setter Property="Padding" Value="18,9" />
+        <Setter Property="MinWidth" Value="88" />
+        <Setter Property="Margin" Value="8,0,0,0" />
+        <Setter Property="Cursor" Value="Hand" />
+        <Setter Property="BorderThickness" Value="0" />
+        <Setter Property="Template">
+            <Setter.Value>
+                <ControlTemplate TargetType="Button">
+                    <Border
+                        x:Name="Bd"
+                        Padding="{TemplateBinding Padding}"
+                        Background="{TemplateBinding Background}"
+                        CornerRadius="6"
+                        SnapsToDevicePixels="True">
+                        <ContentPresenter HorizontalAlignment="Center" VerticalAlignment="Center" />
+                    </Border>
+                    <ControlTemplate.Triggers>
+                        <Trigger Property="IsMouseOver" Value="True">
+                            <Setter TargetName="Bd" Property="Opacity" Value="0.88" />
+                        </Trigger>
+                        <Trigger Property="IsPressed" Value="True">
+                            <Setter TargetName="Bd" Property="Opacity" Value="0.78" />
+                        </Trigger>
+                        <Trigger Property="IsEnabled" Value="False">
+                            <Setter TargetName="Bd" Property="Opacity" Value="0.45" />
+                        </Trigger>
+                    </ControlTemplate.Triggers>
+                </ControlTemplate>
+            </Setter.Value>
+        </Setter>
+    </Style>
+
+    <!-- 主操作按钮（确认、确定） -->
+    <Style
+        x:Key="DialogButtonPrimary"
+        BasedOn="{StaticResource DialogButtonBase}"
+        TargetType="Button">
+        <Setter Property="Background" Value="{DynamicResource Brush.Accent}" />
+        <Setter Property="Foreground" Value="White" />
+    </Style>
+
+    <!-- 次要按钮（取消、稍后） -->
+    <Style
+        x:Key="DialogButtonSecondary"
+        BasedOn="{StaticResource DialogButtonBase}"
+        TargetType="Button">
+        <Setter Property="Background" Value="{DynamicResource Brush.SurfaceAlt}" />
+        <Setter Property="Foreground" Value="{DynamicResource Brush.Text}" />
+    </Style>
+
+    <!-- 危险操作按钮（删除、永久删除） -->
+    <Style
+        x:Key="DialogButtonDanger"
+        BasedOn="{StaticResource DialogButtonBase}"
+        TargetType="Button">
+        <Setter Property="Background" Value="{DynamicResource Brush.Danger}" />
+        <Setter Property="Foreground" Value="White" />
+    </Style>
+
+    <!-- 成功态按钮 -->
+    <Style
+        x:Key="DialogButtonSuccess"
+        BasedOn="{StaticResource DialogButtonBase}"
+        TargetType="Button">
+        <Setter Property="Background" Value="{DynamicResource Brush.Success}" />
+        <Setter Property="Foreground" Value="White" />
+    </Style>
+
+    <!-- 中性按钮（关闭、导航） -->
+    <Style
+        x:Key="DialogButtonNeutral"
+        BasedOn="{StaticResource DialogButtonBase}"
+        TargetType="Button">
+        <Setter Property="Background" Value="{DynamicResource Brush.Border}" />
+        <Setter Property="Foreground" Value="{DynamicResource Brush.Text}" />
+    </Style>
+
+    <!-- 深强调按钮（合并等次级主操作） -->
+    <Style
+        x:Key="DialogButtonAccentDeep"
+        BasedOn="{StaticResource DialogButtonBase}"
+        TargetType="Button">
+        <Setter Property="Background" Value="{DynamicResource Brush.AccentHover}" />
+        <Setter Property="Foreground" Value="White" />
+    </Style>
+
+    <!-- 弱化主色按钮（批量操作等） -->
+    <Style
+        x:Key="DialogButtonMuted"
+        BasedOn="{StaticResource DialogButtonBase}"
+        TargetType="Button">
+        <Setter Property="Background" Value="{DynamicResource Brush.TextSecondary}" />
+        <Setter Property="Foreground" Value="White" />
+    </Style>
+
+</ResourceDictionary>

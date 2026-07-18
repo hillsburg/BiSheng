@@ -1,0 +1,19 @@
+<Solution>
+  <Folder Name="/cursor/">
+    <File Path=".cursor/conventions.mdc" />
+    <File Path=".cursor/rules/code-conventions.mdc" />
+  </Folder>
+  <Folder Name="/src/">
+    <Project Path="src/BiSheng.Shared/BiSheng.Shared.csproj" />
+    <Project Path="src/BiSheng.Editor/BiSheng.Editor.csproj" />
+    <Project Path="src/BiSheng.Server/BiSheng.Server.csproj" />
+    <Project Path="src/BiSheng.Latte/BiSheng.Latte.csproj" />
+    <Project Path="src/ICSharpCode.AvalonEdit/ICSharpCode.AvalonEdit.csproj" />
+    <Project Path="src/docs/BiSheng.Docs.csproj" />
+  </Folder>
+  <Folder Name="/tests/">
+    <Project Path="tests/BiSheng.Editor.Tests/BiSheng.Editor.Tests.csproj" />
+    <Project Path="tests/BiSheng.Latte.Tests/BiSheng.Latte.Tests.csproj" />
+    <Project Path="tests/BiSheng.Server.Tests/BiSheng.Server.Tests.csproj" />
+  </Folder>
+</Solution>

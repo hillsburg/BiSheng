@@ -1,0 +1,33 @@
+<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+                    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+                    xmlns:sys="clr-namespace:System;assembly=mscorlib">
+
+    <!-- iconfont 工具栏图标（与 iconfont.ttf PUA 码点一致） -->
+    <!-- 用法：Content="{StaticResource Icon.Search}" FontFamily="{StaticResource IconFont}" -->
+    <sys:String x:Key="Icon.About">&#xe604;</sys:String>
+    <sys:String x:Key="Icon.Offline">&#xe60e;</sys:String>
+    <sys:String x:Key="Icon.Account">&#xe610;</sys:String>
+    <sys:String x:Key="Icon.Link">&#xe61c;</sys:String>
+    <!-- 手动同步 -->
+    <sys:String x:Key="Icon.Sync2">&#xe638;</sys:String>
+    <!-- 本地备份 -->
+    <sys:String x:Key="Icon.Backup">&#xe647;</sys:String>
+    <!-- 外观设置 -->
+    <sys:String x:Key="Icon.Style">&#xe64b;</sys:String>
+    <!-- 笔记大纲 -->
+    <sys:String x:Key="Icon.Outline">&#xe656;</sys:String>
+    <!-- 同步与安全 -->
+    <sys:String x:Key="Icon.SyncSettings">&#xe669;</sys:String>
+    <!-- 导出全数据 -->
+    <sys:String x:Key="Icon.Export">&#xe67c;</sys:String>
+    <!-- 全文搜索 -->
+    <sys:String x:Key="Icon.Search">&#xe6bc;</sys:String>
+    <sys:String x:Key="Icon.Login">&#xe6bd;</sys:String>
+    <!-- 回收站 -->
+    <sys:String x:Key="Icon.Trash">&#xe7e4;</sys:String>
+    <!-- 历史版本 -->
+    <sys:String x:Key="Icon.History">&#xe9fd;</sys:String>
+    <!-- 折叠导航面板 -->
+    <sys:String x:Key="Icon.Collapse">&#xeb6d;</sys:String>
+
+</ResourceDictionary>

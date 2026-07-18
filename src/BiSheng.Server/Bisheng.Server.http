@@ -1,0 +1,6 @@
+﻿@BiSheng.Server_HostAddress = http://localhost:5095
+
+GET {{BiSheng.Server_HostAddress}}/weatherforecast/
+Accept: application/json
+
+###

@@ -1,0 +1,123 @@
+<Window
+    x:Class="BiSheng.Latte.Views.BackupManagerWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:conv="clr-namespace:BiSheng.Latte.Converters"
+    Title="BiSheng Latte - 本地备份"
+    Width="900"
+    Height="560"
+    MinWidth="760"
+    MinHeight="480"
+    Background="{DynamicResource Brush.BgCanvas}"
+    WindowStartupLocation="CenterOwner">
+
+    <Window.Resources>
+        <BooleanToVisibilityConverter x:Key="BoolToVis" />
+        <conv:InverseBoolToVisibilityConverter x:Key="InverseBoolToVis" />
+    </Window.Resources>
+
+    <DockPanel Style="{StaticResource WindowPaddedRoot}">
+        <Border DockPanel.Dock="Top" Style="{StaticResource WindowInfoCard}">
+            <StackPanel>
+                <TextBlock Style="{StaticResource WindowTitleText}" Text="本地备份" />
+                <TextBlock
+                    Margin="0,8,0,0"
+                    Style="{StaticResource WindowSubtitleText}"
+                    Text="{Binding HeaderDirectory}" />
+                <TextBlock
+                    Margin="0,4,0,0"
+                    Style="{StaticResource WindowHintText}"
+                    Text="{Binding HeaderPolicy}" />
+                <TextBlock
+                    Margin="0,8,0,0"
+                    Style="{StaticResource WindowHintText}"
+                    Text="备份仅包含 local.db；图片文件仍在应用目录 images/ 文件夹中。" />
+                <TextBlock
+                    Margin="0,8,0,0"
+                    Foreground="{DynamicResource Brush.Accent}"
+                    Style="{StaticResource WindowHintText}"
+                    Text="{Binding LegacyHintText}"
+                    Visibility="{Binding ShowLegacyHint, Converter={StaticResource BoolToVis}}" />
+            </StackPanel>
+        </Border>
+
+        <Border Padding="0,16,0,0" DockPanel.Dock="Bottom">
+            <DockPanel>
+                <TextBlock
+                    VerticalAlignment="Center"
+                    DockPanel.Dock="Left"
+                    Style="{StaticResource WindowHintText}"
+                    Text="{Binding StatusText}" />
+                <StackPanel Margin="-8,0,0,0" HorizontalAlignment="Right" Orientation="Horizontal">
+                    <Button
+                        Command="{Binding BackupNowCommand}"
+                        Content="立即备份"
+                        Style="{StaticResource DialogButtonPrimary}" />
+                    <Button
+                        Command="{Binding RefreshCommand}"
+                        Content="刷新"
+                        Style="{StaticResource DialogButtonSecondary}" />
+                    <Button
+                        Command="{Binding RevealSelectedCommand}"
+                        Content="定位文件"
+                        Style="{StaticResource DialogButtonSecondary}" />
+                    <Button
+                        Command="{Binding DeleteSelectedCommand}"
+                        Content="删除所选"
+                        Style="{StaticResource DialogButtonDanger}" />
+                    <Button
+                        Command="{Binding OpenFolderCommand}"
+                        Content="打开目录"
+                        Style="{StaticResource DialogButtonSecondary}" />
+                </StackPanel>
+            </DockPanel>
+        </Border>
+
+        <Grid Margin="0,16,0,0">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="1.2*" MinWidth="380" />
+                <ColumnDefinition Width="16" />
+                <ColumnDefinition Width="*" MinWidth="260" />
+            </Grid.ColumnDefinitions>
+
+            <Grid Grid.Column="0">
+                <ListView
+                    ItemContainerStyle="{StaticResource WindowListViewItem}"
+                    ItemsSource="{Binding Backups}"
+                    SelectedItem="{Binding SelectedBackup, Mode=TwoWay}"
+                    Style="{StaticResource WindowListView}">
+                    <ListView.View>
+                        <GridView ColumnHeaderContainerStyle="{StaticResource WindowGridViewColumnHeader}">
+                            <GridViewColumn Width="130" DisplayMemberBinding="{Binding CreatedAtLocalDisplay}" Header="时间" />
+                            <GridViewColumn Width="80" DisplayMemberBinding="{Binding SizeDisplay}" Header="大小" />
+                            <GridViewColumn Width="52" DisplayMemberBinding="{Binding NoteCountLabel}" Header="笔记" />
+                            <GridViewColumn Width="64" DisplayMemberBinding="{Binding TriggerLabel}" Header="触发" />
+                            <GridViewColumn Width="52" DisplayMemberBinding="{Binding IntegrityLabel}" Header="完整性" />
+                        </GridView>
+                    </ListView.View>
+                </ListView>
+                <TextBlock
+                    Style="{StaticResource QuietEmptyStateText}"
+                    Text="尚无备份，可点击「立即备份」创建第一份"
+                    Visibility="{Binding HasBackups, Converter={StaticResource InverseBoolToVis}}" />
+            </Grid>
+
+            <Border Grid.Column="2" Style="{StaticResource WindowInfoCard}">
+                <DockPanel>
+                    <TextBlock
+                        DockPanel.Dock="Top"
+                        FontWeight="SemiBold"
+                        Style="{StaticResource WindowPanelHeader}"
+                        Text="备份详情" />
+                    <ScrollViewer Margin="0,12,0,0" VerticalScrollBarVisibility="Auto">
+                        <TextBlock
+                            FontSize="13"
+                            Foreground="{DynamicResource Brush.TextSecondary}"
+                            Text="{Binding DetailText}"
+                            TextWrapping="Wrap" />
+                    </ScrollViewer>
+                </DockPanel>
+            </Border>
+        </Grid>
+    </DockPanel>
+</Window>

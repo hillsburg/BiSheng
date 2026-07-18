@@ -1,0 +1,23 @@
+# Litestream 示例配置（可选连续复制，非应用内置）
+# 安装: https://litestream.io/install/
+# 用法:
+#   1. 复制为 /etc/litestream.yml 并按环境修改路径与远端
+#   2. systemctl enable --now litestream
+# 说明: 仍建议保留 scripts/server-backup/backup-bisheng.sh 做周期冷/在线快照；
+#       Litestream 负责更细粒度的时间点恢复。uploads/ 需另用 rsync/restic 备份。
+
+dbs:
+  - path: /opt/bisheng/bisheng.db
+    replicas:
+      # 示例 A：本机另一目录（先验证流程）
+      - type: file
+        path: /var/backups/bisheng-litestream
+
+      # 示例 B：S3 兼容存储（取消注释并填写）
+      # - type: s3
+      #   bucket: your-bucket
+      #   path: bisheng
+      #   region: auto
+      #   endpoint: https://s3.example.com
+      #   access-key-id: ${LITESTREAM_ACCESS_KEY_ID}
+      #   secret-access-key: ${LITESTREAM_SECRET_ACCESS_KEY}

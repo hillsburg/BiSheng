@@ -1,0 +1,70 @@
+<Window
+    x:Class="BiSheng.Latte.Views.TrashWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="BiSheng Latte - 回收站"
+    Width="640"
+    Height="480"
+    MinWidth="520"
+    MinHeight="360"
+    Background="{DynamicResource Brush.BgCanvas}"
+    WindowStartupLocation="CenterOwner">
+
+    <DockPanel Style="{StaticResource WindowPaddedRoot}">
+        <StackPanel Margin="0,0,0,12" DockPanel.Dock="Top">
+            <TextBlock Style="{StaticResource WindowTitleText}" Text="回收站" />
+            <TextBlock
+                x:Name="HintText"
+                Style="{StaticResource WindowHintText}"
+                Margin="0,6,0,0" />
+        </StackPanel>
+
+        <StackPanel
+            Margin="-8,0,0,0"
+            DockPanel.Dock="Bottom"
+            HorizontalAlignment="Right"
+            Orientation="Horizontal">
+            <Button
+                x:Name="RestoreButton"
+                Click="OnRestore"
+                Content="恢复"
+                Style="{StaticResource DialogButtonPrimary}" />
+            <Button
+                x:Name="DeleteButton"
+                Click="OnDeletePermanently"
+                Content="永久删除"
+                Style="{StaticResource DialogButtonDanger}" />
+            <Button
+                x:Name="EmptyButton"
+                Click="OnEmptyTrash"
+                Content="清空回收站"
+                Style="{StaticResource DialogButtonNeutral}" />
+            <Button
+                Click="OnClose"
+                Content="关闭"
+                Style="{StaticResource DialogButtonNeutral}" />
+        </StackPanel>
+
+        <Grid>
+            <ListView
+                x:Name="TrashList"
+                ItemContainerStyle="{StaticResource WindowListViewItem}"
+                SelectionMode="Single"
+                Style="{StaticResource WindowListView}">
+                <ListView.View>
+                    <GridView ColumnHeaderContainerStyle="{StaticResource WindowGridViewColumnHeader}">
+                        <GridViewColumn Width="72" DisplayMemberBinding="{Binding TypeLabel}" Header="类型" />
+                        <GridViewColumn Width="260" DisplayMemberBinding="{Binding DisplayName}" Header="名称" />
+                        <GridViewColumn Width="140" DisplayMemberBinding="{Binding DeletedAtLocal}" Header="删除时间" />
+                        <GridViewColumn Width="80" DisplayMemberBinding="{Binding DaysRemaining}" Header="剩余天" />
+                    </GridView>
+                </ListView.View>
+            </ListView>
+            <TextBlock
+                x:Name="EmptyStateText"
+                Style="{StaticResource QuietEmptyStateText}"
+                Text="回收站是空的"
+                Visibility="Collapsed" />
+        </Grid>
+    </DockPanel>
+</Window>

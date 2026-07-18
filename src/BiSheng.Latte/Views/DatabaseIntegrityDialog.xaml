@@ -1,0 +1,42 @@
+<Window
+    x:Class="BiSheng.Latte.Views.DatabaseIntegrityDialog"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    Title="BiSheng Latte - 数据库异常"
+    Width="480"
+    Height="320"
+    Background="{DynamicResource Brush.BgCanvas}"
+    ResizeMode="NoResize"
+    WindowStartupLocation="CenterOwner">
+
+    <DockPanel Style="{StaticResource WindowPaddedRoot}">
+        <StackPanel Margin="-8,0,0,0" DockPanel.Dock="Bottom" Orientation="Horizontal">
+            <Button
+                Click="OnOpenBackupManager"
+                Content="打开备份管理"
+                Style="{StaticResource DialogButtonPrimary}" />
+            <Button
+                Click="OnDismiss"
+                Content="稍后处理"
+                Style="{StaticResource DialogButtonSecondary}" />
+        </StackPanel>
+
+        <StackPanel>
+            <TextBlock
+                Foreground="{DynamicResource Brush.Danger}"
+                Style="{StaticResource WindowTitleText}"
+                Text="本地数据库可能已损坏" />
+            <TextBlock
+                Margin="0,12,0,0"
+                Style="{StaticResource WindowSubtitleText}"
+                Text="启动时完整性检查未通过。您可以尝试从备份管理中选择最近的快照；恢复前请先完全退出应用。" />
+            <Border Margin="0,16,0,0" Style="{StaticResource WindowInfoCard}">
+                <TextBlock
+                    x:Name="DetailText"
+                    FontSize="12"
+                    Foreground="{DynamicResource Brush.TextMuted}"
+                    TextWrapping="Wrap" />
+            </Border>
+        </StackPanel>
+    </DockPanel>
+</Window>

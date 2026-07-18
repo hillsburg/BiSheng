@@ -1,0 +1,153 @@
+@page "/admin/login"
+@model LoginModel
+@{
+    Layout = "_Layout";
+    ViewData["Title"] = "管理员登录";
+}
+
+<style>
+    .login-wrapper {
+        min-height: calc(100vh - 180px);
+        display: flex;
+        align-items: center;
+        justify-content: center;
+    }
+
+    .login-card {
+        width: 100%;
+        max-width: 380px;
+        background: var(--bg-elevated);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        padding: 44px 40px;
+        animation: fadeUp 0.6s ease-out both;
+        animation-delay: 0.1s;
+    }
+
+    .login-brand {
+        font-family: var(--font-display);
+        font-size: 28px;
+        font-weight: 400;
+        letter-spacing: -0.03em;
+        color: var(--text);
+        margin-bottom: 6px;
+    }
+
+    .login-subtitle {
+        font-size: 14px;
+        color: var(--text-muted);
+        margin-bottom: 32px;
+    }
+
+    .login-card .btn-primary {
+        width: 100%;
+        padding: 11px 20px;
+        margin-top: 4px;
+    }
+
+    .login-footer {
+        margin-top: 24px;
+        text-align: center;
+        font-size: 12.5px;
+        color: var(--text-muted);
+    }
+
+    .totp-input {
+        font-family: var(--font-mono);
+        font-size: 20px;
+        letter-spacing: 0.4em;
+        text-align: center;
+    }
+
+    .login-back-link {
+        display: inline-block;
+        margin-top: 16px;
+        font-size: 13px;
+        color: var(--text-muted);
+        text-decoration: none;
+    }
+
+    .login-back-link:hover {
+        color: var(--accent);
+    }
+</style>
+
+<div class="login-wrapper">
+    <div class="login-card">
+        <h1 class="login-brand">BiSheng</h1>
+        <p class="login-subtitle">管理员登录</p>
+
+        @if (Model.SetupDone)
+        {
+            <div class="alert alert-success">
+                初始化完成！请登录后在 <a href="/admin/keys" style="font-weight:600;">API Keys</a> 页面获取您的密钥。
+            </div>
+        }
+
+        @if (Model.IsRateLimited)
+        {
+            <div class="alert" style="background:rgba(234,179,8,0.1); color:#b45309; border:1px solid rgba(234,179,8,0.3);">
+                @LoginModel.RateLimitMessage
+            </div>
+        }
+
+        @if (Model.IsTotpStep)
+        {
+            <!-- 第二步：TOTP 验证码 -->
+            <p class="login-subtitle">正在为 <strong style="color:var(--text);">@Model.PendingUsername</strong> 验证</p>
+
+            @if (!string.IsNullOrEmpty(Model.ErrorMessage))
+            {
+                <div class="alert alert-danger">@Model.ErrorMessage</div>
+            }
+
+            <form method="post">
+                @Html.AntiForgeryToken()
+                <div class="form-group">
+                    <label>验证码</label>
+                    <input asp-for="TotpCode" required autofocus maxlength="6" pattern="[0-9]{6}"
+                           placeholder="输入 App 显示的 6 位数字"
+                           autocomplete="off" inputmode="numeric"
+                           class="totp-input" />
+                </div>
+                <button type="submit" class="btn btn-primary">验证并登录</button>
+            </form>
+
+            <div style="text-align:center;">
+                <a href="/admin/login?reset=1" class="login-back-link">&larr; 返回登录</a>
+            </div>
+        }
+        else
+        {
+            <!-- 第一步：用户名 + 密码 -->
+            @if (Model.IsDevelopment)
+            {
+                <div class="alert" style="background:rgba(234,179,8,0.1); color:#b45309; border:1px solid rgba(234,179,8,0.3);">
+                    开发调试环境，无需 TOTP 验证
+                </div>
+            }
+
+            @if (!string.IsNullOrEmpty(Model.ErrorMessage))
+            {
+                <div class="alert alert-danger">@Model.ErrorMessage</div>
+            }
+
+            <form method="post">
+                @Html.AntiForgeryToken()
+                <div class="form-group">
+                    <label>用户名</label>
+                    <input asp-for="Username" required autofocus placeholder="请输入用户名" />
+                </div>
+                <div class="form-group">
+                    <label>密码</label>
+                    <input asp-for="Password" type="password" required placeholder="请输入密码" />
+                </div>
+                <button type="submit" class="btn btn-primary">@(Model.IsDevelopment ? "登录" : "下一步")</button>
+            </form>
+        }
+
+        <div class="login-footer">
+            BiSheng Server · 笔记同步服务
+        </div>
+    </div>
+</div>

@@ -1,0 +1,181 @@
+<Window
+    x:Class="BiSheng.Latte.Views.NoteSearchWindow"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml"
+    xmlns:conv="clr-namespace:BiSheng.Latte.Converters"
+    xmlns:search="clr-namespace:BiSheng.Latte.Controls.Search"
+    Title="全文搜索"
+    Width="1100"
+    Height="720"
+    MinWidth="960"
+    MinHeight="600"
+    Background="{DynamicResource Brush.BgCanvas}"
+    WindowStartupLocation="CenterOwner">
+
+    <Window.InputBindings>
+        <KeyBinding Key="Return" Command="{Binding SearchCommand}" />
+        <KeyBinding Key="F3" Command="{Binding NextHitCommand}" />
+        <KeyBinding Key="F3" Modifiers="Shift" Command="{Binding PreviousHitCommand}" />
+    </Window.InputBindings>
+
+    <!-- 全文搜索窗口样式见 WindowChromeStyles.xaml -->
+    <Window.Resources>
+        <conv:InverseBoolToVisibilityConverter x:Key="InverseBoolToVis" />
+    </Window.Resources>
+
+    <DockPanel>
+        <Border DockPanel.Dock="Top" Style="{StaticResource WindowHeaderBorder}">
+            <DockPanel>
+                <StackPanel Margin="-8,0,0,0" DockPanel.Dock="Right" Orientation="Horizontal">
+                    <CheckBox
+                        Margin="0,0,12,0"
+                        VerticalAlignment="Center"
+                        Content="仅标题"
+                        IsChecked="{Binding SearchTitleOnly}" />
+                    <Button
+                        Command="{Binding SearchCommand}"
+                        Content="搜索"
+                        Style="{StaticResource DialogButtonPrimary}" />
+                </StackPanel>
+                <TextBox
+                    Padding="10,8"
+                    VerticalContentAlignment="Center"
+                    FontFamily="{StaticResource UIFont}"
+                    FontSize="14"
+                    Background="{DynamicResource Brush.SurfaceAlt}"
+                    BorderBrush="{DynamicResource Brush.BorderLight}"
+                    Style="{StaticResource WatermarkTextBox}"
+                    Tag="搜索标题或正文…"
+                    Text="{Binding SearchQuery, UpdateSourceTrigger=PropertyChanged}" />
+            </DockPanel>
+        </Border>
+
+        <Border
+            Padding="20,10"
+            Background="{DynamicResource Brush.SurfaceAlt}"
+            BorderBrush="{DynamicResource Brush.BorderLight}"
+            BorderThickness="0,0,0,1"
+            DockPanel.Dock="Top">
+            <TextBlock Style="{StaticResource WindowHintText}" Text="{Binding StatusText}" />
+        </Border>
+
+        <Grid Margin="16">
+            <Grid.ColumnDefinitions>
+                <ColumnDefinition Width="2.8*" />
+                <ColumnDefinition Width="2.2*" />
+                <ColumnDefinition Width="5*" />
+            </Grid.ColumnDefinitions>
+
+            <DockPanel Grid.Column="0" Margin="0,0,8,0">
+                <TextBlock DockPanel.Dock="Top" Style="{StaticResource WindowPanelHeader}" Text="命中笔记" />
+                <Grid>
+                    <ListBox
+                        x:Name="ResultList"
+                        Background="Transparent"
+                        BorderThickness="0"
+                        ItemContainerStyle="{StaticResource SearchResultListItem}"
+                        ItemsSource="{Binding Results}"
+                        MouseDoubleClick="OnResultDoubleClick"
+                        SelectedItem="{Binding SelectedResult}">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <StackPanel>
+                                    <TextBlock
+                                        FontSize="13"
+                                        FontWeight="SemiBold"
+                                        Text="{Binding Title}"
+                                        TextTrimming="CharacterEllipsis" />
+                                    <StackPanel Margin="0,4,0,0" Orientation="Horizontal">
+                                        <TextBlock
+                                            FontSize="11"
+                                            Foreground="{DynamicResource Brush.TextMuted}"
+                                            Text="{Binding FolderPath}"
+                                            TextTrimming="CharacterEllipsis" />
+                                        <TextBlock
+                                            Margin="8,0,0,0"
+                                            FontSize="11"
+                                            Foreground="{DynamicResource Brush.Accent}"
+                                            Text="{Binding HitCount, StringFormat=· {0} 处}" />
+                                    </StackPanel>
+                                </StackPanel>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                    <TextBlock
+                        Style="{StaticResource QuietEmptyStateText}"
+                        Text="{Binding ResultsEmptyHint}"
+                        Visibility="{Binding HasResults, Converter={StaticResource InverseBoolToVis}}" />
+                </Grid>
+            </DockPanel>
+
+            <DockPanel Grid.Column="1" Margin="0,0,8,0">
+                <TextBlock DockPanel.Dock="Top" Style="{StaticResource WindowPanelHeader}" Text="命中与操作" />
+                <StackPanel DockPanel.Dock="Bottom" Margin="0,8,0,0">
+                    <TextBlock Margin="0,0,0,8" FontSize="12">
+                        <Run Text="第 " />
+                        <Run FontWeight="SemiBold" Text="{Binding ActiveHitDisplayIndex, Mode=OneWay}" />
+                        <Run Text=" / " />
+                        <Run Text="{Binding ActiveHitCount, Mode=OneWay}" />
+                        <Run Text=" 处" />
+                    </TextBlock>
+                    <StackPanel Margin="-8,0,0,0" Orientation="Horizontal">
+                        <Button
+                            Command="{Binding PreviousHitCommand}"
+                            Content="上一个"
+                            Style="{StaticResource DialogButtonNeutral}" />
+                        <Button
+                            Command="{Binding NextHitCommand}"
+                            Content="下一个"
+                            Style="{StaticResource DialogButtonNeutral}" />
+                    </StackPanel>
+                    <Button
+                        Command="{Binding OpenInEditorCommand}"
+                        Content="在编辑器中打开"
+                        Style="{StaticResource DialogButtonPrimary}" />
+                </StackPanel>
+                <Grid>
+                    <ListBox
+                        x:Name="HitList"
+                        Background="Transparent"
+                        BorderThickness="0"
+                        ItemContainerStyle="{StaticResource SearchResultListItem}"
+                        ItemsSource="{Binding Hits}"
+                        SelectedItem="{Binding SelectedHit}">
+                        <ListBox.ItemTemplate>
+                            <DataTemplate>
+                                <Button
+                                    Padding="0"
+                                    Background="Transparent"
+                                    BorderThickness="0"
+                                    Command="{Binding DataContext.SelectHitCommand, RelativeSource={RelativeSource AncestorType=Window}}"
+                                    CommandParameter="{Binding}"
+                                    HorizontalContentAlignment="Stretch">
+                                    <TextBlock
+                                        FontSize="12"
+                                        Text="{Binding Snippet}"
+                                        TextTrimming="CharacterEllipsis"
+                                        TextWrapping="Wrap" />
+                                </Button>
+                            </DataTemplate>
+                        </ListBox.ItemTemplate>
+                    </ListBox>
+                    <TextBlock
+                        Style="{StaticResource QuietEmptyStateText}"
+                        Text="{Binding HitsEmptyHint}"
+                        Visibility="{Binding HasHits, Converter={StaticResource InverseBoolToVis}}" />
+                </Grid>
+            </DockPanel>
+
+            <DockPanel Grid.Column="2">
+                <TextBlock DockPanel.Dock="Top" Style="{StaticResource WindowPanelHeader}" Text="预览" />
+                <Grid>
+                    <search:NoteSearchPreviewControl x:Name="PreviewControl" />
+                    <TextBlock
+                        Style="{StaticResource QuietEmptyStateText}"
+                        Text="选中命中后在此预览"
+                        Visibility="{Binding HasPreview, Converter={StaticResource InverseBoolToVis}}" />
+                </Grid>
+            </DockPanel>
+        </Grid>
+    </DockPanel>
+</Window>

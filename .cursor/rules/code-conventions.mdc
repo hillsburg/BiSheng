@@ -1,0 +1,10 @@
+---
+description: 
+alwaysApply: true
+---
+
+- Code must be comment in simplified Chinese with standard comment of the target coding language
+- indentation should be surrounded with curly brackets
+- back brace } should be followed by a blank line
+- enum item, property, method, should be with comment
+- complex logic should be commented

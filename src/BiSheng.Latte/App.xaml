@@ -1,0 +1,112 @@
+<Application
+    x:Class="BiSheng.Latte.App"
+    xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation"
+    xmlns:x="http://schemas.microsoft.com/winfx/2006/xaml">
+    <Application.Resources>
+        <ResourceDictionary>
+            <ResourceDictionary.MergedDictionaries>
+                <ResourceDictionary Source="Resources/Fonts/IconResources.xaml" />
+                <ResourceDictionary Source="Resources/NavItemStyles.xaml" />
+                <ResourceDictionary Source="Resources/DialogStyles.xaml" />
+                <ResourceDictionary Source="Resources/WindowChromeStyles.xaml" />
+                <ResourceDictionary Source="Resources/AppControls.xaml" />
+            </ResourceDictionary.MergedDictionaries>
+
+            <!--  ===== Latte 设计系统 =====  -->
+
+            <!--  UI 字体：清晰可读的系统字体（按钮、菜单、列表等）  -->
+            <FontFamily x:Key="UIFont">Microsoft YaHei, Segoe UI</FontFamily>
+
+            <!--  内容字体：微软雅黑（编辑器；启动后由主题覆盖，用户可在设置中自选系统字体）  -->
+            <FontFamily x:Key="ContentFont">Microsoft YaHei, Segoe UI</FontFamily>
+
+            <!--  代码字体：等宽字体  -->
+            <FontFamily x:Key="CodeFont">Consolas, Fira Code, Courier New</FontFamily>
+
+            <!--  图标字体  -->
+            <FontFamily x:Key="IconFont">pack://application:,,,/Resources/Fonts/iconfont.ttf#iconfont</FontFamily>
+
+            <!--  色彩系统：Latte 暖咖啡（默认主题，启动后由 ThemeManager 覆盖）  -->
+            <SolidColorBrush x:Key="Brush.BgCanvas" Color="#F8F4EF" />
+            <SolidColorBrush x:Key="Brush.Surface" Color="#FFFCF8" />
+            <SolidColorBrush x:Key="Brush.SurfaceAlt" Color="#F2ECE3" />
+            <SolidColorBrush x:Key="Brush.Text" Color="#3C3228" />
+            <SolidColorBrush x:Key="Brush.TextSecondary" Color="#8A7D70" />
+            <SolidColorBrush x:Key="Brush.TextMuted" Color="#B5AA9E" />
+            <SolidColorBrush x:Key="Brush.Border" Color="#DDD4C8" />
+            <SolidColorBrush x:Key="Brush.BorderLight" Color="#EAE3D9" />
+            <SolidColorBrush x:Key="Brush.Accent" Color="#A67C52" />
+            <SolidColorBrush x:Key="Brush.AccentHover" Color="#8E6840" />
+            <SolidColorBrush x:Key="Brush.Hover" Color="#EDE5D8" />
+            <SolidColorBrush x:Key="Brush.Selected" Color="#DDD0BC" />
+            <SolidColorBrush x:Key="Brush.SelectedBorder" Color="#C4A67D" />
+            <SolidColorBrush x:Key="Brush.ToolbarBg" Color="#2C2520" />
+            <SolidColorBrush x:Key="Brush.ToolbarText" Color="#C8B8A4" />
+            <SolidColorBrush x:Key="Brush.ToolbarIcon" Color="#D4C4B0" />
+            <SolidColorBrush x:Key="Brush.ToolbarHover" Color="#3D342D" />
+            <SolidColorBrush x:Key="Brush.Danger" Color="#C0392B" />
+            <SolidColorBrush x:Key="Brush.Success" Color="#6B8E5A" />
+            <SolidColorBrush x:Key="Brush.ComboBoxBg" Color="#FFFCF8" />
+            <SolidColorBrush x:Key="Brush.TabBg" Color="#F2ECE3" />
+            <SolidColorBrush x:Key="Brush.TabSelectedBg" Color="#FFFCF8" />
+            <SolidColorBrush x:Key="Brush.TooltipBg" Color="#2C2520" />
+            <SolidColorBrush x:Key="Brush.TooltipText" Color="#C8B8A4" />
+
+            <!--  全局 Window 样式  -->
+            <Style TargetType="Window">
+                <Setter Property="FontFamily" Value="{StaticResource UIFont}" />
+                <Setter Property="FontSize" Value="14" />
+                <Setter Property="Background" Value="{DynamicResource Brush.BgCanvas}" />
+                <Setter Property="Foreground" Value="{DynamicResource Brush.Text}" />
+                <Setter Property="Icon" Value="/Resources/img/latte.icon.png" />
+            </Style>
+
+            <!--  全局 TextBlock 样式  -->
+            <Style TargetType="TextBlock">
+                <Setter Property="FontFamily" Value="{StaticResource UIFont}" />
+                <Setter Property="Foreground" Value="{DynamicResource Brush.Text}" />
+            </Style>
+
+            <!--  全局 TextBox 样式  -->
+            <Style TargetType="TextBox">
+                <Setter Property="FontFamily" Value="{StaticResource UIFont}" />
+                <Setter Property="Foreground" Value="{DynamicResource Brush.Text}" />
+                <Setter Property="Background" Value="{DynamicResource Brush.BgCanvas}" />
+                <Setter Property="BorderBrush" Value="{DynamicResource Brush.Border}" />
+                <Setter Property="CaretBrush" Value="{DynamicResource Brush.Accent}" />
+                <Style.Triggers>
+                    <Trigger Property="IsFocused" Value="True">
+                        <Setter Property="BorderBrush" Value="{DynamicResource Brush.Accent}" />
+                    </Trigger>
+                </Style.Triggers>
+            </Style>
+
+            <!--  全局 PasswordBox：与 TextBox 同色，掩码显示密钥  -->
+            <Style TargetType="PasswordBox">
+                <Setter Property="FontFamily" Value="{StaticResource UIFont}" />
+                <Setter Property="Foreground" Value="{DynamicResource Brush.Text}" />
+                <Setter Property="Background" Value="{DynamicResource Brush.BgCanvas}" />
+                <Setter Property="BorderBrush" Value="{DynamicResource Brush.Border}" />
+                <Setter Property="CaretBrush" Value="{DynamicResource Brush.Accent}" />
+                <Style.Triggers>
+                    <Trigger Property="IsFocused" Value="True">
+                        <Setter Property="BorderBrush" Value="{DynamicResource Brush.Accent}" />
+                    </Trigger>
+                </Style.Triggers>
+            </Style>
+
+            <!--  全局 Button 样式  -->
+            <Style TargetType="Button">
+                <Setter Property="FontFamily" Value="{StaticResource UIFont}" />
+                <Setter Property="Foreground" Value="{DynamicResource Brush.Text}" />
+            </Style>
+
+            <!--  全局 ListBox 样式  -->
+            <Style TargetType="ListBox">
+                <Setter Property="FontFamily" Value="{StaticResource UIFont}" />
+                <Setter Property="Background" Value="Transparent" />
+                <Setter Property="BorderThickness" Value="0" />
+            </Style>
+        </ResourceDictionary>
+    </Application.Resources>
+</Application>
