@@ -1,5 +1,6 @@
 using System.IO;
 using BiSheng.Latte.Data.Entities;
+using BiSheng.Latte.Services;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
 
@@ -34,12 +35,12 @@ public class LocalDbContext : DbContext
 
     public LocalDbContext()
     {
-        _dbPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "local.db");
+        _dbPath = LatteAppPaths.DatabaseFile;
     }
 
     public LocalDbContext(DbContextOptions<LocalDbContext> options) : base(options)
     {
-        _dbPath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "local.db");
+        _dbPath = LatteAppPaths.DatabaseFile;
     }
 
     /// <summary>测试专用：共享 in-memory 连接，由 BiSheng.Latte.Tests 设置</summary>

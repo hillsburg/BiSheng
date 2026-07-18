@@ -17,8 +17,28 @@ public partial class App : Application
 
     protected override async void OnStartup(StartupEventArgs e)
     {
+        // 先迁移 exe 旁旧数据，再初始化日志与打开数据库
+        LatteLegacyMigrationResult? migration = null;
+        Exception? migrationError = null;
+        try
+        {
+            migration = LatteLegacyDataMigrator.MigrateIfNeeded();
+        }
+        catch (Exception ex)
+        {
+            migrationError = ex;
+        }
+
         LogHelper.Initialize();
         LogHelper.Info("应用启动");
+        if (migrationError != null)
+        {
+            LogHelper.Error("从 exe 旁迁移用户数据失败，将继续使用 LocalAppData 路径", migrationError);
+        }
+        else if (migration?.HadWork == true)
+        {
+            LogHelper.Info(migration.Summary);
+        }
 
         LatteHost.Build();
 

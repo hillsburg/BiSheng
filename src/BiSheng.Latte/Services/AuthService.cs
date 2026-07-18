@@ -14,7 +14,6 @@ namespace BiSheng.Latte.Services;
 /// </summary>
 public partial class AuthService : ObservableObject
 {
-    private const string ConfigFileName = "config.json";
     private const string DpapiPrefix = "dpapi:";
     private readonly string _configFilePath;
 
@@ -54,7 +53,8 @@ public partial class AuthService : ObservableObject
 
     public AuthService()
     {
-        _configFilePath = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, ConfigFileName);
+        LatteAppPaths.EnsureRoot();
+        _configFilePath = LatteAppPaths.ConfigFile;
         LoadConfig();
     }
 

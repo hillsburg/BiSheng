@@ -145,9 +145,7 @@ public class AppearanceSettings
     // ===== 持久化 =====
 
     private static string SettingsPath =>
-        Path.Combine(
-            Environment.GetFolderPath(Environment.SpecialFolder.LocalApplicationData),
-            "BiSheng", "Latte", "appearance.json");
+        Path.Combine(Services.LatteAppPaths.Root, "appearance.json");
 
     /// <summary>
     /// 从磁盘加载设置（文件不存在则返回默认值）

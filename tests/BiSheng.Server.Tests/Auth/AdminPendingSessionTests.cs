@@ -134,7 +134,12 @@ public class AdminPendingSessionTests
     private static AdminPendingSessionService CreateSessionService()
     {
         var provider = DataProtectionProvider.Create(nameof(AdminPendingSessionTests));
-        var configuration = new ConfigurationBuilder().Build();
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Cookies:SecureAlways"] = "false"
+            })
+            .Build();
         return new AdminPendingSessionService(provider, configuration);
     }
 

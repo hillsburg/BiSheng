@@ -529,7 +529,7 @@ public class ExportService
     /// <summary>images 目录下按 UUID 查找图片文件</summary>
     private static string? TryImagesDirectoryPath(string imageId)
     {
-        var imagesDir = Path.Combine(AppDomain.CurrentDomain.BaseDirectory, "images");
+        var imagesDir = LatteAppPaths.ImagesDirectory;
         if (!Directory.Exists(imagesDir))
         {
             return null;

@@ -193,7 +193,7 @@ public partial class BackupManagerViewModel : ObservableObject
         if (SelectedBackup == null)
         {
             DetailText = Backups.Count == 0
-                ? "尚无备份。点击「立即备份」创建第一份 local.db 快照。\n\n说明：备份仅包含 local.db；图片仍在应用目录 images/ 文件夹中。"
+                ? "尚无备份。点击「立即备份」创建第一份 local.db 快照。\n\n说明：备份仅包含 local.db；图片在 %LocalAppData%\\BiSheng\\Latte\\images\\ 中。"
                 : "请从列表中选择一个备份。";
             return;
         }
