@@ -4,6 +4,10 @@
     <TargetFramework>net8.0</TargetFramework>
     <Nullable>enable</Nullable>
     <ImplicitUsings>enable</ImplicitUsings>
+    <Version>$(BiShengVersion)</Version>
+    <AssemblyVersion>$(BiShengVersion).0</AssemblyVersion>
+    <FileVersion>$(BiShengVersion).0</FileVersion>
+    <InformationalVersion>$(BiShengVersion)</InformationalVersion>
   </PropertyGroup>
 
   <ItemGroup>

@@ -1,5 +1,4 @@
 using System.IO;
-using System.Reflection;
 using System.Text.Json;
 
 namespace BiSheng.Latte.Models;
@@ -71,7 +70,7 @@ public class LocalDatabaseBackupManifest
 
     /// <summary>当前程序集版本字符串</summary>
     public static string CurrentAppVersion() =>
-        Assembly.GetExecutingAssembly().GetName().Version?.ToString() ?? "unknown";
+        Services.LatteAppVersion.DisplayVersion;
 
     /// <summary>触发来源的中文标签</summary>
     public static string GetTriggerLabel(BackupTrigger trigger) => trigger switch

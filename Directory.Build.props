@@ -1,0 +1,6 @@
+<Project>
+  <!-- Latte 与 Server 共用产品版本；GitHub Release tag 建议 v$(BiShengVersion) -->
+  <PropertyGroup>
+    <BiShengVersion>0.1.0</BiShengVersion>
+  </PropertyGroup>
+</Project>

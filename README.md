@@ -77,7 +77,7 @@ dotnet build Bisheng.slnx -c Release
 dotnet run --project src/BiSheng.Latte/BiSheng.Latte.csproj -c Release
 ```
 
-On first launch the app creates a local SQLite database next to the executable. No server configuration is required.
+On first launch the app creates data under `%LocalAppData%\BiSheng\Latte\` (`local.db`, config, images). No server configuration is required.
 
 ### Run the sync server (optional)
 
@@ -91,11 +91,19 @@ Then in the Latte client: **Toolbar → 同步与安全** — enter server URL a
 
 ### Publish (Windows x64)
 
+Framework-dependent publish:
+
 ```bash
 dotnet publish src/BiSheng.Latte/BiSheng.Latte.csproj -c Release -r win-x64 --self-contained false
 ```
 
-Output is under `src/BiSheng.Latte/bin/Release/net8.0-windows/win-x64/publish/`.
+Latte and Server share one product version (`BiShengVersion` in `Directory.Build.props`). One GitHub Release ships both:
+
+```powershell
+.\scripts\release\pack-all.ps1
+```
+
+See [`scripts/release/README.md`](scripts/release/README.md). Tag `v0.1.0` (or Actions → Release) publishes Latte Velopack packages + Server zip. In the app: **Toolbar → 关于** → 检查更新.
 
 ---
 

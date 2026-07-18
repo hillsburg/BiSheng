@@ -109,6 +109,12 @@
                     Style="{StaticResource ToolbarButton}"
                     Tag="外观与样式设置" />
                 <Button
+                    Command="{Binding OpenAboutCommand}"
+                    Content="{StaticResource Icon.About}"
+                    FontFamily="{StaticResource IconFont}"
+                    Style="{StaticResource ToolbarButton}"
+                    Tag="关于与检查更新" />
+                <Button
                     Command="{Binding OpenTrashCommand}"
                     Content="{StaticResource Icon.Trash}"
                     FontFamily="{StaticResource IconFont}"
@@ -227,6 +233,12 @@
                     FontFamily="{StaticResource IconFont}"
                     Style="{StaticResource ToolbarButtonVertical}"
                     Tag="外观与样式设置" />
+                <Button
+                    Command="{Binding OpenAboutCommand}"
+                    Content="{StaticResource Icon.About}"
+                    FontFamily="{StaticResource IconFont}"
+                    Style="{StaticResource ToolbarButtonVertical}"
+                    Tag="关于与检查更新" />
                 <Button
                     Command="{Binding OpenTrashCommand}"
                     Content="{StaticResource Icon.Trash}"
