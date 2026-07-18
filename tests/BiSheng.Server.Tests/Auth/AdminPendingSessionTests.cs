@@ -9,6 +9,7 @@ using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc.Testing;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Configuration;
 using OtpNet;
 
 namespace BiSheng.Server.Tests.Auth;
@@ -133,7 +134,13 @@ public class AdminPendingSessionTests
     private static AdminPendingSessionService CreateSessionService()
     {
         var provider = DataProtectionProvider.Create(nameof(AdminPendingSessionTests));
-        return new AdminPendingSessionService(provider);
+        var configuration = new ConfigurationBuilder()
+            .AddInMemoryCollection(new Dictionary<string, string?>
+            {
+                ["Cookies:SecureAlways"] = "false"
+            })
+            .Build();
+        return new AdminPendingSessionService(provider, configuration);
     }
 
     /// <summary>创建不自动跟随重定向的测试客户端（仍处理 Cookie）</summary>
