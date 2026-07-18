@@ -689,6 +689,10 @@ public partial class MainViewModel
     [RelayCommand]
     private void OpenAppearance() => _dialogs.OpenAppearance();
 
+    /// <summary>打开关于与检查更新</summary>
+    [RelayCommand]
+    private void OpenAbout() => _dialogs.OpenAbout();
+
     [RelayCommand]
     private void OpenNoteHistory() => _dialogs.OpenNoteHistory();
 

@@ -20,6 +20,7 @@ public static class ServiceCollectionExtensions
             sp.GetRequiredService<ILocalDbContextFactory>().Create);
 
         services.AddSingleton<AuthService>();
+        services.AddSingleton<AppUpdateService>();
         services.AddSingleton<ApiClient>();
         services.AddSingleton<SignalRService>();
         services.AddSingleton(_ => SyncSettings.Load());

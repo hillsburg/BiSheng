@@ -24,4 +24,7 @@ public interface IMainWindowHost
 
     /// <summary>打开本地备份管理对话框</summary>
     void ShowBackupManagerDialog();
+
+    /// <summary>打开关于与检查更新对话框</summary>
+    void ShowAboutDialog();
 }

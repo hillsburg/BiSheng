@@ -31,6 +31,9 @@ public interface IDialogNavigationService
     /// <summary>打开外观设置</summary>
     void OpenAppearance();
 
+    /// <summary>打开关于与检查更新</summary>
+    void OpenAbout();
+
     /// <summary>打开当前笔记历史版本</summary>
     void OpenNoteHistory();
 

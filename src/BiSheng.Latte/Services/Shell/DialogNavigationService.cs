@@ -9,6 +9,7 @@ namespace BiSheng.Latte.Services.Shell;
 public sealed class DialogNavigationService : IDialogNavigationService
 {
     private readonly AuthService _authService;
+    private readonly AppUpdateService _updates;
     private readonly SyncService _syncEngine;
     private readonly ImageSyncService _imageSync;
     private readonly EditorViewModel _editor;
@@ -30,6 +31,7 @@ public sealed class DialogNavigationService : IDialogNavigationService
     /// <summary>构造对话框导航服务</summary>
     public DialogNavigationService(
         AuthService authService,
+        AppUpdateService updates,
         SyncService syncEngine,
         ImageSyncService imageSync,
         EditorViewModel editor,
@@ -40,6 +42,7 @@ public sealed class DialogNavigationService : IDialogNavigationService
         NavigationViewModel navigation)
     {
         _authService = authService;
+        _updates = updates;
         _syncEngine = syncEngine;
         _imageSync = imageSync;
         _editor = editor;
@@ -137,6 +140,12 @@ public sealed class DialogNavigationService : IDialogNavigationService
         {
             host.ApplyAppearanceSettings();
         }
+    }
+
+    /// <inheritdoc />
+    public void OpenAbout()
+    {
+        _getHost?.Invoke()?.ShowAboutDialog();
     }
 
     /// <inheritdoc />

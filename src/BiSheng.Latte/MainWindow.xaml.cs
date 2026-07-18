@@ -1,6 +1,7 @@
 ﻿using System.Windows;
 using System.Windows.Controls;
 using System.Windows.Input;
+using BiSheng.Latte.Composition;
 using BiSheng.Latte.Helpers;
 using BiSheng.Latte.Models;
 using BiSheng.Latte.Services;
@@ -214,6 +215,18 @@ public partial class MainWindow : Window, IMainWindowHost
 
     void IMainWindowHost.ShowBackupManagerDialog() =>
         BackupManagerHost.ShowManager(this);
+
+    void IMainWindowHost.ShowAboutDialog()
+    {
+        var dialog = new AboutWindow(
+            LatteHost.GetRequiredService<AppUpdateService>(),
+            LatteHost.GetRequiredService<SyncService>(),
+            LatteHost.GetRequiredService<ImageSyncService>())
+        {
+            Owner = this
+        };
+        dialog.ShowDialog();
+    }
 
     private void ToggleMaximize()
     {
