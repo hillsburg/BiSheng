@@ -1,0 +1,102 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - "v*"
+  workflow_dispatch:
+    inputs:
+      version:
+        description: "版本号（不含 v 前缀，例如 0.1.0）"
+        required: true
+        type: string
+
+permissions:
+  contents: write
+
+jobs:
+  test:
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Test Server
+        run: dotnet test tests/BiSheng.Server.Tests/BiSheng.Server.Tests.csproj --configuration Release --verbosity normal
+
+      - name: Test Latte
+        run: dotnet test tests/BiSheng.Latte.Tests/BiSheng.Latte.Tests.csproj --configuration Release --verbosity normal
+
+  release:
+    needs: test
+    runs-on: windows-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Resolve version
+        id: ver
+        shell: pwsh
+        run: |
+          if ("${{ github.event_name }}" -eq "workflow_dispatch") {
+            $v = "${{ inputs.version }}".Trim().TrimStart('v', 'V')
+          } else {
+            $ref = "${{ github.ref_name }}"
+            if ($ref -notmatch '^v') {
+              throw "Tag 必须以 v 开头，例如 v0.1.0（当前: $ref）"
+            }
+            $v = $ref.Substring(1)
+          }
+          if ($v -notmatch '^\d+\.\d+\.\d+') {
+            throw "版本号格式应为 x.y.z（当前: $v）"
+          }
+          Add-Content -Path $env:GITHUB_OUTPUT -Value "version=$v"
+          Write-Host "Release version: $v"
+
+      - name: Setup .NET
+        uses: actions/setup-dotnet@v4
+        with:
+          dotnet-version: 8.0.x
+
+      - name: Install vpk
+        run: dotnet tool install -g vpk --version 1.2.0
+
+      - name: Pack Latte + Server
+        shell: pwsh
+        run: |
+          .\scripts\release\pack-all.ps1 -Version "${{ steps.ver.outputs.version }}"
+
+      - name: Create GitHub Release
+        shell: pwsh
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          $v = "${{ steps.ver.outputs.version }}"
+          $tag = "v$v"
+          $dir = "artifacts/release/$v"
+          $files = @(Get-ChildItem -Path $dir -File | ForEach-Object { $_.FullName })
+          if ($files.Count -eq 0) {
+            throw "未找到发版产物: $dir"
+          }
+
+          $notes = @"
+## BiSheng $v
+
+本 Release 同时包含：
+
+- **Latte**（Windows）：Velopack 安装/更新包
+- **Server**（linux-x64）：framework-dependent 部署 zip（目标机需 .NET 8 ASP.NET Core Runtime）
+
+校验见 ``SHA256SUMS.txt``。客户端在「关于」中检查更新；服务端参见部署文档。
+"@
+
+          gh release create $tag @files `
+            --title "BiSheng $v" `
+            --notes $notes `
+            --target "${{ github.sha }}" `
+            --latest

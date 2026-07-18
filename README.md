@@ -97,13 +97,13 @@ Framework-dependent publish:
 dotnet publish src/BiSheng.Latte/BiSheng.Latte.csproj -c Release -r win-x64 --self-contained false
 ```
 
-For installable builds with in-app updates (Velopack), use:
+Latte and Server share one product version (`BiShengVersion` in `Directory.Build.props`). One GitHub Release ships both:
 
 ```powershell
-.\scripts\latte-release\pack-velopack.ps1
+.\scripts\release\pack-all.ps1
 ```
 
-See [`scripts/latte-release/README.md`](scripts/latte-release/README.md). In the app: **Toolbar → 关于** → 检查更新.
+See [`scripts/release/README.md`](scripts/release/README.md). Tag `v0.1.0` (or Actions → Release) publishes Latte Velopack packages + Server zip. In the app: **Toolbar → 关于** → 检查更新.
 
 ---
 

@@ -9,10 +9,10 @@
     <ApplicationIcon>Resources\img\latte.icon.ico</ApplicationIcon>
     <!-- 自定义 Main：Velopack 须先于 WPF 启动 -->
     <StartupObject>BiSheng.Latte.Program</StartupObject>
-    <Version>$(BiShengLatteVersion)</Version>
-    <AssemblyVersion>$(BiShengLatteVersion).0</AssemblyVersion>
-    <FileVersion>$(BiShengLatteVersion).0</FileVersion>
-    <InformationalVersion>$(BiShengLatteVersion)</InformationalVersion>
+    <Version>$(BiShengVersion)</Version>
+    <AssemblyVersion>$(BiShengVersion).0</AssemblyVersion>
+    <FileVersion>$(BiShengVersion).0</FileVersion>
+    <InformationalVersion>$(BiShengVersion)</InformationalVersion>
   </PropertyGroup>
 
   <ItemGroup>
