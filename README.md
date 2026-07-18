@@ -158,7 +158,7 @@ See [CONTRIBUTING.md](CONTRIBUTING.md). Summary:
 Production deployment guide (Chinese, Apache reverse proxy + HTTPS):
 
 - [`src/docs/部署文档.md`](src/docs/部署文档.md)
-- Server backup / restore (ops scripts, optional Litestream): [`src/docs/服务端备份与恢复运维指南.md`](src/docs/服务端备份与恢复运维指南.md), [`scripts/server-backup/`](scripts/server-backup/)
+- Server backup / restore / upgrade (ops scripts): [`src/docs/服务端备份与恢复运维指南.md`](src/docs/服务端备份与恢复运维指南.md), [`scripts/server-backup/`](scripts/server-backup/), [`scripts/server-upgrade/`](scripts/server-upgrade/)
 - Client + server update design (Velopack / upgrade script, Chinese): [`src/docs/客户端与服务端更新机制设计文档.md`](src/docs/客户端与服务端更新机制设计文档.md)
 
 Typical production setup: Kestrel behind Apache/Nginx on port 443, with `X-Forwarded-*` headers. Security notes: [`src/docs/认证与安全设计文档.md`](src/docs/认证与安全设计文档.md).
