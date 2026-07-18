@@ -282,6 +282,10 @@ ServiceFabricBackup/
 .omo/
 .qoder/
 
+# 本地工具与临时目录
+.cursor/
+tmp/
+
 # Business Intelligence projects
 *.rdl.data
 *.bim.layout
