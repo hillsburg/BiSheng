@@ -28,7 +28,8 @@ git tag v0.1.0
 git push origin v0.1.0
 ```
 
-工作流：`.github/workflows/release.yml`（先跑测试，再打包并创建 GitHub Release）。
+工作流：`.github/workflows/release.yml`（先跑测试，再打包并创建 GitHub Release）。  
+Release 说明由 `gh --generate-notes` 根据上一 tag 以来的 PR/commit 自动生成，可事后在 GitHub 上 Edit。
 
 也可在 Actions 里用 `workflow_dispatch` 填入版本号（不带 `v`）。
 
