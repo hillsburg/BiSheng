@@ -177,15 +177,28 @@ Contributions for `en-US` strings are welcome even before the infrastructure lan
 
 ---
 
-## Third-party components
+## Acknowledgments / 鸣谢
 
-BiSheng depends on several open-source libraries. See [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md) (to be added) for the full list.
+BiSheng stands on the shoulders of many open-source projects. Thank you to their authors and contributors.
 
-Notable vendored code:
+| Project | Role in BiSheng | License (typical) |
+|---------|-----------------|-------------------|
+| [AvalonEdit](https://github.com/icsharpcode/AvalonEdit) | Text editor core (vendored under `src/ICSharpCode.AvalonEdit/`) | MIT |
+| [Markdig](https://github.com/xoofx/markdig) | Markdown parsing / rendering | BSD-2-Clause |
+| [Velopack](https://github.com/velopack/velopack) | Windows install & auto-update | MIT |
+| [CommunityToolkit.Mvvm](https://github.com/CommunityToolkit/dotnet) | MVVM helpers for Latte | MIT |
+| [Entity Framework Core](https://github.com/dotnet/efcore) + SQLite provider | Local & server persistence | MIT / Apache-2.0 |
+| [NLog](https://github.com/NLog/NLog) | Client logging | BSD-3-Clause |
+| [WebView2](https://developer.microsoft.com/microsoft-edge/webview2/) | Preview / web host surfaces | Microsoft terms |
+| [Open XML SDK](https://github.com/dotnet/Open-XML-SDK) | Word export | MIT |
+| [Otp.NET](https://github.com/kspearrin/Otp.NET) | Admin TOTP | MIT |
+| [QRCoder](https://github.com/codebude/QRCoder) | TOTP setup QR codes | MIT |
+| ASP.NET Core / SignalR | Sync server & realtime | MIT |
 
-- **AvalonEdit** (`src/ICSharpCode.AvalonEdit/`) — MIT License, ic#code / SharpDevelop team
+Full package inventory and notices: [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).
 
 ---
+
 
 ## Contributing
 
