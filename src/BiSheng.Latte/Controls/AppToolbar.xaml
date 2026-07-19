@@ -109,12 +109,6 @@
                     Style="{StaticResource ToolbarButton}"
                     Tag="外观与样式设置" />
                 <Button
-                    Command="{Binding OpenAboutCommand}"
-                    Content="{StaticResource Icon.About}"
-                    FontFamily="{StaticResource IconFont}"
-                    Style="{StaticResource ToolbarButton}"
-                    Tag="关于与检查更新" />
-                <Button
                     Command="{Binding OpenTrashCommand}"
                     Content="{StaticResource Icon.Trash}"
                     FontFamily="{StaticResource IconFont}"
@@ -145,26 +139,42 @@
                     Style="{StaticResource ToolbarButton}"
                     Tag="手动同步" />
                 <ctrl:ConnectionStatusBadge Margin="4,0" />
+                <Button
+                    Command="{Binding OpenAboutCommand}"
+                    Content="{StaticResource Icon.About}"
+                    FontFamily="{StaticResource IconFont}"
+                    Style="{StaticResource ToolbarButton}"
+                    Tag="关于与检查更新" />
                 <Border Style="{StaticResource ToolbarSeparatorHorizontal}" />
+                <!-- 窗口按钮：显式 ToolTip + UIFont，避免继承 Segoe MDL2 导致中文 tooltip 乱码 -->
                 <Button
                     Command="{Binding MinimizeWindowCommand}"
                     Content="&#xE921;"
                     FontFamily="Segoe MDL2 Assets"
-                    Style="{StaticResource ToolbarButton}"
-                    Tag="最小化" />
+                    Style="{StaticResource ToolbarButton}">
+                    <Button.ToolTip>
+                        <ToolTip Content="最小化" FontFamily="{StaticResource UIFont}" />
+                    </Button.ToolTip>
+                </Button>
                 <Button
                     Command="{Binding ToggleMaximizeWindowCommand}"
                     Content="{Binding MaximizeButtonGlyph}"
                     FontFamily="Segoe MDL2 Assets"
-                    Style="{StaticResource ToolbarButton}"
-                    Tag="{Binding MaximizeButtonTooltip}" />
+                    Style="{StaticResource ToolbarButton}">
+                    <Button.ToolTip>
+                        <ToolTip Content="{Binding MaximizeButtonTooltip}" FontFamily="{StaticResource UIFont}" />
+                    </Button.ToolTip>
+                </Button>
                 <Button
                     Command="{Binding CloseWindowCommand}"
                     Content="&#xE8BB;"
                     FontFamily="Segoe MDL2 Assets"
                     Foreground="{DynamicResource Brush.Danger}"
-                    Style="{StaticResource ToolbarButton}"
-                    Tag="关闭" />
+                    Style="{StaticResource ToolbarButton}">
+                    <Button.ToolTip>
+                        <ToolTip Content="关闭" FontFamily="{StaticResource UIFont}" />
+                    </Button.ToolTip>
+                </Button>
             </StackPanel>
         </DockPanel>
 
@@ -205,25 +215,40 @@
                     Content="&#xE8BB;"
                     FontFamily="Segoe MDL2 Assets"
                     Foreground="{DynamicResource Brush.Danger}"
-                    Style="{StaticResource ToolbarButtonVertical}"
-                    Tag="关闭" />
+                    Style="{StaticResource ToolbarButtonVertical}">
+                    <Button.ToolTip>
+                        <ToolTip Content="关闭" FontFamily="{StaticResource UIFont}" />
+                    </Button.ToolTip>
+                </Button>
                 <Button
                     Command="{Binding ToggleMaximizeWindowCommand}"
                     Content="{Binding MaximizeButtonGlyph}"
                     FontFamily="Segoe MDL2 Assets"
-                    Style="{StaticResource ToolbarButtonVertical}"
-                    Tag="{Binding MaximizeButtonTooltip}" />
+                    Style="{StaticResource ToolbarButtonVertical}">
+                    <Button.ToolTip>
+                        <ToolTip Content="{Binding MaximizeButtonTooltip}" FontFamily="{StaticResource UIFont}" />
+                    </Button.ToolTip>
+                </Button>
                 <Button
                     Command="{Binding MinimizeWindowCommand}"
                     Content="&#xE921;"
                     FontFamily="Segoe MDL2 Assets"
-                    Style="{StaticResource ToolbarButtonVertical}"
-                    Tag="最小化" />
+                    Style="{StaticResource ToolbarButtonVertical}">
+                    <Button.ToolTip>
+                        <ToolTip Content="最小化" FontFamily="{StaticResource UIFont}" />
+                    </Button.ToolTip>
+                </Button>
             </StackPanel>
 
             <StackPanel HorizontalAlignment="Center" DockPanel.Dock="Bottom">
                 <Border Style="{StaticResource ToolbarSeparatorVertical}" />
                 <ctrl:ConnectionStatusBadge Compact="True" Margin="0,4" />
+                <Button
+                    Command="{Binding OpenAboutCommand}"
+                    Content="{StaticResource Icon.About}"
+                    FontFamily="{StaticResource IconFont}"
+                    Style="{StaticResource ToolbarButtonVertical}"
+                    Tag="关于与检查更新" />
             </StackPanel>
 
             <StackPanel HorizontalAlignment="Center" VerticalAlignment="Center">
@@ -233,12 +258,6 @@
                     FontFamily="{StaticResource IconFont}"
                     Style="{StaticResource ToolbarButtonVertical}"
                     Tag="外观与样式设置" />
-                <Button
-                    Command="{Binding OpenAboutCommand}"
-                    Content="{StaticResource Icon.About}"
-                    FontFamily="{StaticResource IconFont}"
-                    Style="{StaticResource ToolbarButtonVertical}"
-                    Tag="关于与检查更新" />
                 <Button
                     Command="{Binding OpenTrashCommand}"
                     Content="{StaticResource Icon.Trash}"
