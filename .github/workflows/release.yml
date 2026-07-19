@@ -86,21 +86,9 @@ jobs:
             throw "未找到发版产物: $dir"
           }
 
-          # 避免 PowerShell here-string 破坏 workflow YAML 解析
-          $notesPath = Join-Path $dir "RELEASE_NOTES.md"
-          @(
-            "# BiSheng $v"
-            ""
-            "本 Release 同时包含："
-            ""
-            "- Latte (Windows): Velopack 安装/更新包"
-            "- Server (linux-x64): framework-dependent 部署 zip（目标机需 .NET 8 ASP.NET Core Runtime）"
-            ""
-            "校验见 SHA256SUMS.txt。客户端在「关于」中检查更新；服务端参见部署文档。"
-          ) | Set-Content -Path $notesPath -Encoding utf8
-
+          # 根据上一 tag 以来的 PR/commit 自动生成说明（可事后在 GitHub 上 Edit）
           gh release create $tag @files `
             --title "BiSheng $v" `
-            --notes-file $notesPath `
+            --generate-notes `
             --target "${{ github.sha }}" `
             --latest
