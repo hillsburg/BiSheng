@@ -95,4 +95,72 @@ public class FullSyncSnapshotTests
             .SingleAsync();
         Assert.Equal(100, finalCursor);
     }
+
+    /// <summary>
+    /// 跨文件夹/笔记边界分页：批量 Skip/Take 路径与旧 offset 语义一致
+    /// </summary>
+    [Fact]
+    public async Task Pull_SinceZero_PaginatesAcrossFolderNoteBoundary()
+    {
+        using var fixture = new TestDbFactory();
+        var (userId, apiKeyId, folderId, noteId) = fixture.SeedUserWithNote("body");
+
+        var folder2Id = Guid.NewGuid();
+        fixture.Db.Folders.Add(new Folder
+        {
+            Id = folder2Id,
+            UserId = userId,
+            Name = "F2",
+            Version = 2,
+            UpdatedAt = DateTime.UtcNow
+        });
+        var note2Id = Guid.NewGuid();
+        fixture.Db.Notes.Add(new Note
+        {
+            Id = note2Id,
+            UserId = userId,
+            FolderId = folderId,
+            Title = "N2",
+            Content = "y",
+            Version = 3,
+            UpdatedAt = DateTime.UtcNow
+        });
+
+        var meta = await fixture.Db.UserSyncMetas.SingleAsync(m => m.UserId == userId);
+        meta.CurrentVersion = 30;
+        await fixture.Db.SaveChangesAsync();
+
+        var sync = SyncServiceFactory.New(fixture.Db);
+        var pulled = new List<ChangeDto>();
+        long offset = 0;
+        for (var i = 0; i < 10; i++)
+        {
+            var page = await sync.PullAsync(
+                userId, apiKeyId, since: 0, limit: 1, snapshotOffset: offset);
+            Assert.True(page.IsEntitySnapshot);
+            Assert.True(page.Changes.Count <= 1);
+            pulled.AddRange(page.Changes);
+            if (!page.HasMore)
+            {
+                Assert.Equal(30, page.NextSince);
+                break;
+            }
+
+            offset = page.NextSince;
+        }
+
+        // 2 folders + 2 notes
+        Assert.Equal(4, pulled.Count);
+        Assert.Equal(2, pulled.Count(c => c.EntityType == EntityTypes.Folder));
+        Assert.Equal(2, pulled.Count(c => c.EntityType == EntityTypes.Note));
+        Assert.Contains(pulled, c => c.EntityId == folderId);
+        Assert.Contains(pulled, c => c.EntityId == folder2Id);
+        Assert.Contains(pulled, c => c.EntityId == noteId);
+        Assert.Contains(pulled, c => c.EntityId == note2Id);
+
+        // 文件夹页必须全部出现在笔记页之前
+        var firstNoteIndex = pulled.FindIndex(c => c.EntityType == EntityTypes.Note);
+        Assert.True(firstNoteIndex >= 0);
+        Assert.All(pulled.Take(firstNoteIndex), c => Assert.Equal(EntityTypes.Folder, c.EntityType));
+    }
 }
