@@ -404,10 +404,18 @@
         <nav class="navbar">
             <a href="/admin" class="navbar-brand">BiSheng</a>
             <div class="navbar-nav">
-                <a href="/admin">仪表盘</a>
-                <a href="/admin/notes">笔记</a>
-                <a href="/admin/folders">文件夹</a>
-                <a href="/admin/keys">Keys</a>
+                @{
+                    var path = Context.Request.Path.Value ?? string.Empty;
+                    string NavClass(string href) =>
+                        path.Equals(href, StringComparison.OrdinalIgnoreCase)
+                        || (href != "/admin" && path.StartsWith(href, StringComparison.OrdinalIgnoreCase))
+                            ? "active"
+                            : string.Empty;
+                }
+                <a href="/admin" class="@NavClass("/admin")">仪表盘</a>
+                <a href="/admin/notes" class="@NavClass("/admin/notes")">笔记</a>
+                <a href="/admin/folders" class="@NavClass("/admin/folders")">文件夹</a>
+                <a href="/admin/keys" class="@NavClass("/admin/keys")">Keys</a>
                 <a href="/admin/logout" class="navbar-logout">退出</a>
             </div>
         </nav>

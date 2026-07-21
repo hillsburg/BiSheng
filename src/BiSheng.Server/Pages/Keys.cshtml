@@ -106,9 +106,25 @@
     .key-actions {
         display: flex;
         gap: 8px;
+        flex-wrap: wrap;
+        align-items: center;
+        justify-content: flex-end;
     }
 
     .key-actions form { display: inline; }
+
+    .rename-inline {
+        display: flex;
+        gap: 6px;
+        align-items: center;
+    }
+
+    .rename-inline input {
+        width: 140px;
+        padding: 5px 8px;
+        font-size: 12.5px;
+        margin: 0;
+    }
 
     .empty-state {
         text-align: center;
@@ -116,19 +132,38 @@
         color: var(--text-muted);
         font-size: 14px;
     }
+
+    @@media (max-width: 900px) {
+        table .col-hide-sm { display: none; }
+        .rename-inline { flex-direction: column; align-items: stretch; }
+        .rename-inline input { width: 100%; }
+    }
 </style>
 
 <div class="page-header">
     <h1 class="page-title">API Keys</h1>
-    <p class="page-subtitle">管理客户端连接密钥</p>
+    <p class="page-subtitle">管理客户端连接密钥；明文仅在生成时显示一次</p>
 </div>
 
 @if (!string.IsNullOrEmpty(Model.NewKeyValue))
 {
     <div class="new-key-alert">
-        <p>新 Key 已生成 — 请立即复制保存，此值仅显示一次</p>
-        <div class="key-value">@Model.NewKeyValue</div>
+        <p>
+            @(string.IsNullOrEmpty(Model.NewKeyDeviceName)
+                ? "新 Key 已生成 — 请立即复制保存，此值仅显示一次"
+                : $"「{Model.NewKeyDeviceName}」的 Key 已生成 — 请立即复制保存，此值仅显示一次")
+        </p>
+        <div class="key-value" id="newApiKeyValue">@Model.NewKeyValue</div>
+        <button type="button" class="btn btn-secondary btn-sm" style="margin-top:10px;"
+                onclick="navigator.clipboard.writeText(document.getElementById('newApiKeyValue').textContent).then(()=>this.textContent='已复制').catch(()=>{})">
+            复制 Key
+        </button>
     </div>
+}
+
+@if (!string.IsNullOrEmpty(Model.SuccessMessage))
+{
+    <div class="alert alert-success">@Model.SuccessMessage</div>
 }
 
 @if (!string.IsNullOrEmpty(Model.ErrorMessage))
@@ -156,14 +191,31 @@
     {
         <table>
             <thead>
-                <tr><th>设备名称</th><th>创建时间</th><th>状态</th><th style="text-align:right;">操作</th></tr>
+                <tr>
+                    <th>设备名称</th>
+                    <th>最近使用</th>
+                    <th class="col-hide-sm">创建时间</th>
+                    <th>状态</th>
+                    <th style="text-align:right;">操作</th>
+                </tr>
             </thead>
             <tbody>
                 @foreach (var key in Model.Keys)
                 {
                     <tr>
-                        <td style="font-weight:500;">@key.DeviceName</td>
-                        <td style="color:var(--text-muted);font-size:13px;">@key.CreatedAt.ToString("yyyy-MM-dd HH:mm")</td>
+                        <td style="font-weight:500;">
+                            <form method="post" asp-page-handler="Rename" class="rename-inline">
+                                <input type="hidden" name="RenameKeyId" value="@key.Id" />
+                                <input type="text" name="RenameDeviceName" value="@key.DeviceName" maxlength="128" required aria-label="设备名称" />
+                                <button type="submit" class="btn btn-secondary btn-sm">改名</button>
+                            </form>
+                        </td>
+                        <td style="color:var(--text-muted);font-size:13px;">
+                            @(key.LastUsedAt.HasValue ? IndexModel.FormatUtcLocal(key.LastUsedAt.Value) : "从未")
+                        </td>
+                        <td class="col-hide-sm" style="color:var(--text-muted);font-size:13px;">
+                            @IndexModel.FormatUtcLocal(key.CreatedAt)
+                        </td>
                         <td>
                             @if (key.IsActive)
                             {
@@ -181,13 +233,13 @@
                             }
                         </td>
                         <td style="text-align:right;">
-                            <div class="key-actions" style="justify-content:flex-end;">
+                            <div class="key-actions">
                                 @if (key.IsActive)
                                 {
                                     <form method="post" asp-page-handler="Revoke">
                                         <input type="hidden" name="keyId" value="@key.Id" />
                                         <button type="submit" class="btn btn-danger btn-sm"
-                                                onclick="return confirm('确定要吊销此 Key 吗？')">
+                                                onclick="return confirm('吊销后该设备将无法同步，确定继续？')">
                                             吊销
                                         </button>
                                     </form>
@@ -211,6 +263,6 @@
     }
     else
     {
-        <div class="empty-state">暂无 API Key</div>
+        <div class="empty-state">暂无 API Key。生成一把后，到 Latte「同步设置」中粘贴即可连接。</div>
     }
 </div>

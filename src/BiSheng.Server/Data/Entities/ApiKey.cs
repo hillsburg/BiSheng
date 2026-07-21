@@ -23,6 +23,9 @@ public class ApiKey
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 
+    /// <summary>最近一次成功通过此 Key 认证的时间（UTC）；未使用过为 null</summary>
+    public DateTime? LastUsedAt { get; set; }
+
     // Navigation
     [ForeignKey(nameof(UserId))]
     public User User { get; set; } = null!;

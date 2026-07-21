@@ -1,7 +1,7 @@
 @page "/admin/folders"
 @model FoldersModel
 @{
-    ViewData["Title"] = "文件夹管理";
+    ViewData["Title"] = "浏览文件夹";
 }
 
 <style>
@@ -195,7 +195,7 @@
 
 <div class="page-header">
     <h1 class="page-title">文件夹</h1>
-    <span class="page-count">@Model.Tree.Count 个</span>
+    <span class="page-count">只读浏览 · @Model.Tree.Count 个</span>
 </div>
 
 @if (Model.Tree.Any())
