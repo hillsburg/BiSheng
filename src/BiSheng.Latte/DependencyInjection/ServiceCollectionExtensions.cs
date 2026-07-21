@@ -26,6 +26,7 @@ public static class ServiceCollectionExtensions
         services.AddSingleton(_ => SyncSettings.Load());
 
         services.AddSingleton<LocalEditJournalService>();
+        services.AddSingleton<SyncConflictCleanupService>();
         services.AddSingleton<LocalChangeTracker>();
 
         services.AddSingleton<INavigationReadModel, NavigationReadModel>();

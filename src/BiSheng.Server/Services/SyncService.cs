@@ -161,6 +161,7 @@ public class SyncService : ISyncService
     /// <summary>
     /// 导出当前用户 Folder + Note 表态为分页 ChangeDto（先文件夹后笔记，稳定按 Id 排序）。
     /// 中间页不推进 LastSyncVersion；末页推进到 tip。
+    /// 使用 Count + OrderBy Id + Skip/Take 批量取实体，避免全量 Id 列表与逐条查询。
     /// </summary>
     private async Task<SyncPullResponse> PullEntitySnapshotAsync(
         Guid userId,
@@ -176,21 +177,12 @@ public class SyncService : ISyncService
 
         var offset = snapshotOffset < 0 ? 0 : snapshotOffset;
 
-        var folderIds = await _db.Folders
-            .AsNoTracking()
-            .Where(f => f.UserId == userId)
-            .OrderBy(f => f.Id)
-            .Select(f => f.Id)
-            .ToListAsync(ct);
+        var folderCount = await _db.Folders.AsNoTracking()
+            .CountAsync(f => f.UserId == userId, ct);
+        var noteCount = await _db.Notes.AsNoTracking()
+            .CountAsync(n => n.UserId == userId, ct);
+        var total = (long)folderCount + noteCount;
 
-        var noteIds = await _db.Notes
-            .AsNoTracking()
-            .Where(n => n.UserId == userId)
-            .OrderBy(n => n.Id)
-            .Select(n => n.Id)
-            .ToListAsync(ct);
-
-        var total = folderIds.Count + noteIds.Count;
         if (offset >= total)
         {
             await _clientSyncState.UpsertAsync(_db, userId, apiKeyId, tipVersion, ct);
@@ -205,40 +197,55 @@ public class SyncService : ISyncService
             };
         }
 
-        var changes = new List<ChangeDto>();
+        var changes = new List<ChangeDto>(pageSize);
         var index = offset;
-        while (changes.Count < pageSize && index < total)
+        var remaining = pageSize;
+
+        if (index < folderCount && remaining > 0)
         {
-            if (index < folderIds.Count)
+            var folderSkip = checked((int)index);
+            var folderTake = (int)Math.Min(remaining, folderCount - index);
+            var folders = await _db.Folders.AsNoTracking()
+                .Where(f => f.UserId == userId)
+                .OrderBy(f => f.Id)
+                .Skip(folderSkip)
+                .Take(folderTake)
+                .ToListAsync(ct);
+
+            foreach (var folder in folders)
             {
-                var folderId = folderIds[(int)index];
-                var folder = await _db.Folders.AsNoTracking()
-                    .FirstOrDefaultAsync(f => f.Id == folderId && f.UserId == userId, ct);
-                if (folder != null)
+                var dto = SyncChangeDtoBuilder.BuildFromLiveFolder(folder);
+                if (dto != null)
                 {
-                    var dto = SyncChangeDtoBuilder.BuildFromLiveFolder(folder);
-                    if (dto != null)
-                    {
-                        changes.Add(dto);
-                    }
-                }
-            }
-            else
-            {
-                var noteId = noteIds[(int)(index - folderIds.Count)];
-                var note = await _db.Notes.AsNoTracking()
-                    .FirstOrDefaultAsync(n => n.Id == noteId && n.UserId == userId, ct);
-                if (note != null)
-                {
-                    var dto = SyncChangeDtoBuilder.BuildFromLiveNote(note);
-                    if (dto != null)
-                    {
-                        changes.Add(dto);
-                    }
+                    changes.Add(dto);
                 }
             }
 
-            index++;
+            index += folderTake;
+            remaining -= folderTake;
+        }
+
+        if (remaining > 0 && index < total)
+        {
+            var noteSkip = checked((int)(index - folderCount));
+            var noteTake = (int)Math.Min(remaining, total - index);
+            var notes = await _db.Notes.AsNoTracking()
+                .Where(n => n.UserId == userId)
+                .OrderBy(n => n.Id)
+                .Skip(noteSkip)
+                .Take(noteTake)
+                .ToListAsync(ct);
+
+            foreach (var note in notes)
+            {
+                var dto = SyncChangeDtoBuilder.BuildFromLiveNote(note);
+                if (dto != null)
+                {
+                    changes.Add(dto);
+                }
+            }
+
+            index += noteTake;
         }
 
         var nextOffset = index;

@@ -57,6 +57,7 @@ public partial class App : Application
         LocalDatabaseBackupService.TryRunScheduledBackup(DataSafetySettings.Load(), onExit: false);
 
         LatteHost.GetRequiredService<LocalEditJournalService>().PruneIfNeeded();
+        LatteHost.GetRequiredService<SyncConflictCleanupService>().PruneIfNeeded();
         LatteHost.GetRequiredService<TrashService>().PurgeExpired();
 
         LogHelper.Debug("本地数据库已就绪");
