@@ -29,7 +29,10 @@ public enum ConnectionDisplayState
     /// <summary>存在未解决冲突</summary>
     Conflict,
 
-    /// <summary>已验证且处于空闲/实时连接</summary>
+    /// <summary>已连通，但本地仍有待推送变更</summary>
+    PendingPush,
+
+    /// <summary>已验证且处于空闲/实时连接，本地无待推送</summary>
     Synced,
 }
 
@@ -79,12 +82,14 @@ public static class ConnectionDisplayResolver
     /// <param name="hasConflicts">是否有未解决冲突</param>
     /// <param name="conflictCount">冲突数量</param>
     /// <param name="activityMessage">引擎最近活动文案（推送中/错误详情等，可空）</param>
+    /// <param name="pendingChangeCount">本地待推送变更条数</param>
     public static ConnectionDisplayInfo Resolve(
         AuthService auth,
         SyncStatus syncStatus,
         bool hasConflicts,
         int conflictCount = 0,
-        string? activityMessage = null)
+        string? activityMessage = null,
+        int pendingChangeCount = 0)
     {
         if (hasConflicts && conflictCount > 0)
         {
@@ -152,20 +157,7 @@ public static class ConnectionDisplayResolver
                 auth);
         }
 
-        // 最近一次 Push/Pull 已成功 → 视为已连通，勿被陈旧的 IsServerVerified=false 盖住
-        if (syncStatus == SyncStatus.Connected || auth.IsServerVerified == true)
-        {
-            return Create(
-                ConnectionDisplayState.Synced,
-                "已同步",
-                PreferActivity(activityMessage, "已同步"),
-                "已与服务器连接，变更会自动同步。",
-                ThemeBrushKeys.Success,
-                "\uE73E",
-                auth);
-        }
-
-        if (auth.IsServerVerified == false)
+        if (auth.IsServerVerified == false && syncStatus != SyncStatus.Connected)
         {
             return Create(
                 ConnectionDisplayState.CannotConnect,
@@ -179,13 +171,44 @@ public static class ConnectionDisplayResolver
 
         if (syncStatus == SyncStatus.Error)
         {
+            var errorDetail = pendingChangeCount > 0
+                ? $"最近一次同步失败，本地仍有 {pendingChangeCount} 条未推送，将在网络恢复或下次轮询时重试。"
+                : "最近一次同步失败，将在网络恢复或下次轮询时重试。";
             return Create(
                 ConnectionDisplayState.SyncError,
                 "待重试",
                 PreferActivity(activityMessage, "同步失败，待重试"),
-                "最近一次同步失败，将在网络恢复或下次轮询时重试。",
+                errorDetail,
                 ThemeBrushKeys.Danger,
                 "\uE946",
+                auth);
+        }
+
+        // 最近一次 Push/Pull 已成功，或已验证连通 → 勿被陈旧的 IsServerVerified=false 盖住
+        if (syncStatus == SyncStatus.Connected || auth.IsServerVerified == true)
+        {
+            if (pendingChangeCount > 0)
+            {
+                var shortLabel = pendingChangeCount > 1
+                    ? $"有未推送 ({pendingChangeCount})"
+                    : "有未推送";
+                return Create(
+                    ConnectionDisplayState.PendingPush,
+                    shortLabel,
+                    PreferActivity(activityMessage, $"有 {pendingChangeCount} 条未推送"),
+                    $"本地还有 {pendingChangeCount} 条变更尚未推送到服务器，将自动重试。当前不代表已全部上云。",
+                    ThemeBrushKeys.Accent,
+                    "\uE898",
+                    auth);
+            }
+
+            return Create(
+                ConnectionDisplayState.Synced,
+                "已同步",
+                PreferActivity(activityMessage, "已同步"),
+                "已与服务器连接，本地无待推送变更。",
+                ThemeBrushKeys.Success,
+                "\uE73E",
                 auth);
         }
 

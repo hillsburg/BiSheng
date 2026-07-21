@@ -156,15 +156,39 @@ public partial class MainViewModel
     /// <summary>更新连接状态展示</summary>
     public void UpdateConnectionStatus() => RefreshConnectionDisplay();
 
+    /// <summary>当前本地待推送变更条数</summary>
+    public int GetPendingChangeCount()
+    {
+        try
+        {
+            return _changeTracker.GetPendingChangeCount();
+        }
+        catch
+        {
+            return 0;
+        }
+    }
+
     /// <summary>根据认证与同步状态刷新工具栏徽章与底栏文案</summary>
     public void RefreshConnectionDisplay()
     {
+        var pendingCount = 0;
+        try
+        {
+            pendingCount = _changeTracker.GetPendingChangeCount();
+        }
+        catch (Exception ex)
+        {
+            LogHelper.Debug("读取待推送数量失败: {0}", ex.Message);
+        }
+
         ConnectionDisplay = ConnectionDisplayResolver.Resolve(
             AuthService,
             _currentSyncStatus,
             HasConflicts,
             ConflictCount,
-            _lastSyncActivityMessage);
+            _lastSyncActivityMessage,
+            pendingCount);
         SyncStatusText = ConnectionDisplay.StatusBarText;
     }
 

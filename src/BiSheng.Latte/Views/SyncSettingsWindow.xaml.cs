@@ -13,6 +13,7 @@ public partial class SyncSettingsWindow : Window
     private readonly AuthService _authService;
     private readonly Func<Task>? _onSyncEnabledChanged;
     private readonly Action? _refreshConnectionStatus;
+    private readonly Func<int>? _getPendingChangeCount;
     private readonly Func<Task>? _onDismissWithoutSaveAfterToggle;
     private readonly string _savedServerUrl;
     private readonly string _savedApiKey;
@@ -27,11 +28,13 @@ public partial class SyncSettingsWindow : Window
         Func<Task>? onSyncEnabledChanged = null,
         Action? refreshConnectionStatus = null,
         int initialTabIndex = 0,
-        Func<Task>? onDismissWithoutSaveAfterToggle = null)
+        Func<Task>? onDismissWithoutSaveAfterToggle = null,
+        Func<int>? getPendingChangeCount = null)
     {
         _authService = authService;
         _onSyncEnabledChanged = onSyncEnabledChanged;
         _refreshConnectionStatus = refreshConnectionStatus;
+        _getPendingChangeCount = getPendingChangeCount;
         _onDismissWithoutSaveAfterToggle = onDismissWithoutSaveAfterToggle;
         _savedServerUrl = authService.ServerUrl ?? string.Empty;
         _savedApiKey = authService.ApiKey ?? string.Empty;
@@ -60,7 +63,21 @@ public partial class SyncSettingsWindow : Window
 
     private void UpdateConnectionStatusDisplay()
     {
-        var display = ConnectionDisplayResolver.Resolve(_authService, SyncStatus.Idle, hasConflicts: false);
+        var pending = 0;
+        try
+        {
+            pending = _getPendingChangeCount?.Invoke() ?? 0;
+        }
+        catch
+        {
+            /* 读取失败时按无待推送展示 */
+        }
+
+        var display = ConnectionDisplayResolver.Resolve(
+            _authService,
+            SyncStatus.Idle,
+            hasConflicts: false,
+            pendingChangeCount: pending);
         ConnectionStatusText.Text = display.DetailText;
         ConnectionStatusText.Foreground = TryFindResource(display.BrushKey) as Brush
             ?? TryFindResource(ThemeBrushKeys.TextMuted) as Brush
