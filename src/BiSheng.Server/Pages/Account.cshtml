@@ -94,6 +94,13 @@
     <p class="page-subtitle">@Model.Username · 修改密码与两步验证</p>
 </div>
 
+@if (Model.IsRateLimited)
+{
+    <div class="alert" style="background:rgba(234,179,8,0.1); color:#b45309; border:1px solid rgba(234,179,8,0.3);">
+        @AccountModel.RateLimitMessage
+    </div>
+}
+
 @if (!string.IsNullOrEmpty(Model.SuccessMessage))
 {
     <div class="alert alert-success">@Model.SuccessMessage</div>

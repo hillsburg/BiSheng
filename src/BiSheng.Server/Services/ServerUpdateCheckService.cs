@@ -7,7 +7,10 @@ using Microsoft.Extensions.Options;
 
 namespace BiSheng.Server.Services;
 
-/// <summary>检查 GitHub Releases 上是否有更新的服务端包（只读）</summary>
+/// <summary>
+/// 检查服务端更新（只读）：优先拉取 Update:ManifestUrl 清单；
+/// 可选回退到 GitHub Releases API。
+/// </summary>
 public sealed class ServerUpdateCheckService
 {
     private static readonly JsonSerializerOptions JsonOptions = new()
@@ -44,7 +47,7 @@ public sealed class ServerUpdateCheckService
         return asm.GetName().Version?.ToString(3) ?? "0.0.0";
     }
 
-    /// <summary>查询最新稳定 Release 并与当前版本比较</summary>
+    /// <summary>查询最新版本并与当前比较</summary>
     public async Task<ServerUpdateCheckResult> CheckAsync(CancellationToken cancellationToken = default)
     {
         var current = GetCurrentVersion();
@@ -53,17 +56,109 @@ public sealed class ServerUpdateCheckService
             return ServerUpdateCheckResult.Disabled(current);
         }
 
-        if (string.IsNullOrWhiteSpace(_options.GitHubOwner) || string.IsNullOrWhiteSpace(_options.GitHubRepo))
+        var hasManifest = !string.IsNullOrWhiteSpace(_options.ManifestUrl);
+        var canGitHub = _options.AllowGitHubFallback
+            && !string.IsNullOrWhiteSpace(_options.GitHubOwner)
+            && !string.IsNullOrWhiteSpace(_options.GitHubRepo);
+
+        if (!hasManifest && !canGitHub)
         {
-            return ServerUpdateCheckResult.Failed(current, "未配置 GitHub 仓库。");
+            return ServerUpdateCheckResult.Failed(
+                current,
+                "未配置更新源：请设置 Update:ManifestUrl，或启用 AllowGitHubFallback 并配置 GitHub 仓库。");
         }
 
-        var url =
+        if (hasManifest)
+        {
+            var fromManifest = await CheckFromManifestAsync(current, cancellationToken).ConfigureAwait(false);
+            if (fromManifest.Availability != ServerUpdateAvailability.Failed)
+            {
+                return fromManifest;
+            }
+
+            if (!canGitHub)
+            {
+                return fromManifest;
+            }
+
+            _logger.LogWarning("清单检查失败，回退 GitHub: {Message}", fromManifest.Message);
+        }
+
+        return await CheckFromGitHubAsync(current, cancellationToken).ConfigureAwait(false);
+    }
+
+    /// <summary>从清单 URL 解析 server 段</summary>
+    internal async Task<ServerUpdateCheckResult> CheckFromManifestAsync(
+        string current,
+        CancellationToken cancellationToken)
+    {
+        var url = _options.ManifestUrl!.Trim();
+        try
+        {
+            using var request = new HttpRequestMessage(HttpMethod.Get, url);
+            request.Headers.UserAgent.ParseAdd("BiSheng.Server-UpdateCheck");
+            request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/json"));
+
+            using var response = await _http.SendAsync(request, cancellationToken).ConfigureAwait(false);
+            if (!response.IsSuccessStatusCode)
+            {
+                return ServerUpdateCheckResult.Failed(
+                    current,
+                    $"清单返回 {(int)response.StatusCode}，请检查 Update:ManifestUrl。");
+            }
+
+            await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken)
+                .ConfigureAwait(false);
+            var manifest = await JsonSerializer.DeserializeAsync<UpdateManifestDto>(
+                stream, JsonOptions, cancellationToken).ConfigureAwait(false);
+
+            var server = manifest?.Server;
+            if (server == null || string.IsNullOrWhiteSpace(server.Version))
+            {
+                return ServerUpdateCheckResult.Failed(current, "清单缺少 server.version 字段。");
+            }
+
+            var expectedRid = string.IsNullOrWhiteSpace(_options.ServerRuntime)
+                ? "linux-x64"
+                : _options.ServerRuntime.Trim();
+            if (!string.IsNullOrWhiteSpace(server.Rid)
+                && !string.Equals(server.Rid, expectedRid, StringComparison.OrdinalIgnoreCase))
+            {
+                return ServerUpdateCheckResult.Failed(
+                    current,
+                    $"清单 rid={server.Rid} 与配置 ServerRuntime={expectedRid} 不一致。");
+            }
+
+            return BuildComparisonResult(
+                current,
+                NormalizeVersion(server.Version),
+                releaseUrl: server.ReleaseNotesUrl,
+                downloadUrl: server.DownloadUrl,
+                assetName: server.PackageFile,
+                sourceHint: "清单");
+        }
+        catch (OperationCanceledException)
+        {
+            throw;
+        }
+        catch (Exception ex)
+        {
+            _logger.LogWarning(ex, "读取更新清单失败: {Url}", url);
+            return ServerUpdateCheckResult.Failed(current, $"读取清单失败：{ex.Message}");
+        }
+    }
+
+    /// <summary>GitHub Releases 回退路径</summary>
+    private async Task<ServerUpdateCheckResult> CheckFromGitHubAsync(
+        string current,
+        CancellationToken cancellationToken)
+    {
+        var apiUrl =
             $"https://api.github.com/repos/{_options.GitHubOwner}/{_options.GitHubRepo}/releases/latest";
 
         try
         {
-            using var request = new HttpRequestMessage(HttpMethod.Get, url);
+            using var request = new HttpRequestMessage(HttpMethod.Get, apiUrl);
             request.Headers.UserAgent.ParseAdd("BiSheng.Server-UpdateCheck");
             request.Headers.Accept.Add(new MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
 
@@ -82,7 +177,7 @@ public sealed class ServerUpdateCheckService
                     body.Length > 200 ? body[..200] : body);
                 return ServerUpdateCheckResult.Failed(
                     current,
-                    $"GitHub 返回 {(int)response.StatusCode}，请稍后重试。");
+                    $"GitHub 返回 {(int)response.StatusCode}，请稍后重试或改用 ManifestUrl。");
             }
 
             await using var stream = await response.Content.ReadAsStreamAsync(cancellationToken)
@@ -109,33 +204,14 @@ public sealed class ServerUpdateCheckService
                 ? $"https://github.com/{_options.GitHubOwner}/{_options.GitHubRepo}/releases/tag/{release.TagName}"
                 : release.HtmlUrl;
 
-            var comparison = CompareVersions(current, latest);
-            if (comparison >= 0)
-            {
-                return new ServerUpdateCheckResult
-                {
-                    Availability = ServerUpdateAvailability.UpToDate,
-                    CurrentVersion = current,
-                    LatestVersion = latest,
-                    ReleaseUrl = releaseUrl,
-                    DownloadUrl = asset?.BrowserDownloadUrl,
-                    AssetName = asset?.Name,
-                    Message = $"已是最新（{current}）。"
-                };
-            }
-
-            return new ServerUpdateCheckResult
-            {
-                Availability = ServerUpdateAvailability.UpdateAvailable,
-                CurrentVersion = current,
-                LatestVersion = latest,
-                ReleaseUrl = releaseUrl,
-                DownloadUrl = asset?.BrowserDownloadUrl,
-                AssetName = asset?.Name,
-                Message = asset == null
-                    ? $"发现新版本 {latest}，但未找到 {runtime} 安装包，请打开 Release 页手动下载。"
-                    : $"发现新版本 {latest}。请下载后用 upgrade-bisheng.sh 升级（管理页不会自动安装）。"
-            };
+            return BuildComparisonResult(
+                current,
+                latest,
+                releaseUrl,
+                asset?.BrowserDownloadUrl,
+                asset?.Name,
+                sourceHint: "GitHub",
+                missingAssetMessage: $"发现新版本 {latest}，但未找到 {runtime} 安装包，请打开 Release 页手动下载。");
         }
         catch (OperationCanceledException)
         {
@@ -143,9 +219,49 @@ public sealed class ServerUpdateCheckService
         }
         catch (Exception ex)
         {
-            _logger.LogWarning(ex, "检查服务端更新异常");
+            _logger.LogWarning(ex, "检查服务端更新异常（GitHub）");
             return ServerUpdateCheckResult.Failed(current, $"检查失败：{ex.Message}");
         }
+    }
+
+    private static ServerUpdateCheckResult BuildComparisonResult(
+        string current,
+        string latest,
+        string? releaseUrl,
+        string? downloadUrl,
+        string? assetName,
+        string sourceHint,
+        string? missingAssetMessage = null)
+    {
+        var comparison = CompareVersions(current, latest);
+        if (comparison >= 0)
+        {
+            return new ServerUpdateCheckResult
+            {
+                Availability = ServerUpdateAvailability.UpToDate,
+                CurrentVersion = current,
+                LatestVersion = latest,
+                ReleaseUrl = releaseUrl,
+                DownloadUrl = downloadUrl,
+                AssetName = assetName,
+                Message = $"已是最新（{current}，来源：{sourceHint}）。"
+            };
+        }
+
+        var message = string.IsNullOrEmpty(downloadUrl) && missingAssetMessage != null
+            ? missingAssetMessage
+            : $"发现新版本 {latest}（来源：{sourceHint}）。请下载后用 upgrade-bisheng.sh 升级（管理页不会自动安装）。";
+
+        return new ServerUpdateCheckResult
+        {
+            Availability = ServerUpdateAvailability.UpdateAvailable,
+            CurrentVersion = current,
+            LatestVersion = latest,
+            ReleaseUrl = releaseUrl,
+            DownloadUrl = downloadUrl,
+            AssetName = assetName,
+            Message = message
+        };
     }
 
     /// <summary>去掉 tag 前缀 v/V</summary>
@@ -184,7 +300,6 @@ public sealed class ServerUpdateCheckService
             parts[^1] = "0";
         }
 
-        // Version 最多 4 段；截断预发布后缀
         for (var i = 0; i < parts.Length && i < 4; i++)
         {
             var dash = parts[i].IndexOf('-');
@@ -195,6 +310,34 @@ public sealed class ServerUpdateCheckService
         }
 
         return string.Join('.', parts.Take(4));
+    }
+
+    /// <summary>与设计文档 §2.3 对齐的精简清单（仅消费 server 段）</summary>
+    internal sealed class UpdateManifestDto
+    {
+        [JsonPropertyName("schemaVersion")]
+        public int SchemaVersion { get; set; }
+
+        [JsonPropertyName("server")]
+        public UpdateManifestServerDto? Server { get; set; }
+    }
+
+    internal sealed class UpdateManifestServerDto
+    {
+        [JsonPropertyName("version")]
+        public string? Version { get; set; }
+
+        [JsonPropertyName("rid")]
+        public string? Rid { get; set; }
+
+        [JsonPropertyName("packageFile")]
+        public string? PackageFile { get; set; }
+
+        [JsonPropertyName("downloadUrl")]
+        public string? DownloadUrl { get; set; }
+
+        [JsonPropertyName("releaseNotesUrl")]
+        public string? ReleaseNotesUrl { get; set; }
     }
 
     private sealed class GitHubReleaseDto

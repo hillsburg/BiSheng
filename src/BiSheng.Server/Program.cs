@@ -90,6 +90,12 @@ builder.Services.AddRateLimiter(options =>
             return;
         }
 
+        if (httpContext.Request.Path.StartsWithSegments("/admin/account"))
+        {
+            httpContext.Response.Redirect("/admin/account?rateLimited=1");
+            return;
+        }
+
         httpContext.Response.StatusCode = StatusCodes.Status429TooManyRequests;
         httpContext.Response.ContentType = "application/problem+json";
         var problem = ApiProblemResults.RateLimited(httpContext);
