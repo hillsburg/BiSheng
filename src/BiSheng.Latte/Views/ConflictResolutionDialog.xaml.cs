@@ -21,6 +21,8 @@ public partial class ConflictResolutionDialog : Window
         _syncService = syncService;
         _conflicts = _syncService.GetUnresolvedConflicts();
         _currentIndex = 0;
+        // 须在面板字段赋值后再勾选，避免 Checked 在 InitializeComponent 中空引用闪退
+        ViewSideBySide.IsChecked = true;
         UpdateUI();
     }
 
@@ -61,7 +63,18 @@ public partial class ConflictResolutionDialog : Window
         KeepLocalButton.Content = ConflictDialogCopy.KeepLocalButton(conflict.LocalAction);
         KeepRemoteButton.Content = ConflictDialogCopy.KeepRemoteButton(conflict.LocalAction, conflict.RemoteAction);
 
-        DiffLinesList.ItemsSource = ConflictTextDiffer.BuildUnified(conflict.LocalContent, conflict.RemoteContent);
+        try
+        {
+            DiffLinesList.ItemsSource = ConflictTextDiffer.BuildUnified(
+                conflict.LocalContent,
+                conflict.RemoteContent);
+        }
+        catch (Exception ex)
+        {
+            LogHelper.Error("构建冲突 Diff 失败", ex);
+            DiffLinesList.ItemsSource = null;
+        }
+
         LocalPreview.SetContent(conflict.LocalContent);
         RemotePreview.SetContent(conflict.RemoteContent);
 
@@ -74,6 +87,13 @@ public partial class ConflictResolutionDialog : Window
 
     private void ApplyViewMode()
     {
+        // RadioButton.Checked 可能在 InitializeComponent 中早于面板字段赋值触发
+        if (SideBySidePanel == null || DiffPanel == null || PreviewPanel == null
+            || ViewSideBySide == null || ViewDiff == null || ViewPreview == null)
+        {
+            return;
+        }
+
         var sideBySide = ViewSideBySide.IsChecked == true;
         var diff = ViewDiff.IsChecked == true;
         SideBySidePanel.Visibility = sideBySide ? Visibility.Visible : Visibility.Collapsed;

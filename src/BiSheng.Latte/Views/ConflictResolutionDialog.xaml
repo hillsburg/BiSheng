@@ -18,10 +18,10 @@
                 <Border.Style>
                     <Style TargetType="Border">
                         <Style.Triggers>
-                            <DataTrigger Binding="{Binding Kind}" Value="{x:Static models:ConflictDiffKind.Deleted}">
+                            <DataTrigger Binding="{Binding Kind}" Value="Deleted">
                                 <Setter Property="Background" Value="#33C62828" />
                             </DataTrigger>
-                            <DataTrigger Binding="{Binding Kind}" Value="{x:Static models:ConflictDiffKind.Inserted}">
+                            <DataTrigger Binding="{Binding Kind}" Value="Inserted">
                                 <Setter Property="Background" Value="#332E7D32" />
                             </DataTrigger>
                         </Style.Triggers>
@@ -36,10 +36,10 @@
                         <Style TargetType="TextBlock">
                             <Setter Property="Foreground" Value="{DynamicResource Brush.Text}" />
                             <Style.Triggers>
-                                <DataTrigger Binding="{Binding Kind}" Value="{x:Static models:ConflictDiffKind.Deleted}">
+                                <DataTrigger Binding="{Binding Kind}" Value="Deleted">
                                     <Setter Property="Foreground" Value="#B71C1C" />
                                 </DataTrigger>
-                                <DataTrigger Binding="{Binding Kind}" Value="{x:Static models:ConflictDiffKind.Inserted}">
+                                <DataTrigger Binding="{Binding Kind}" Value="Inserted">
                                     <Setter Property="Foreground" Value="#1B5E20" />
                                 </DataTrigger>
                             </Style.Triggers>
@@ -77,8 +77,7 @@
                         Margin="0,0,16,0"
                         Checked="OnViewModeChanged"
                         Content="对照"
-                        GroupName="ConflictView"
-                        IsChecked="True" />
+                        GroupName="ConflictView" />
                     <RadioButton
                         x:Name="ViewDiff"
                         Margin="0,0,16,0"
