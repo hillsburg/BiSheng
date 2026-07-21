@@ -11,6 +11,9 @@ public interface IMainWindowHost
 
     void Close();
 
+    /// <summary>强制退出应用（托盘「退出」/ 更新前），走完整 flush 与备份</summary>
+    void ExitApplication();
+
     void ApplyAppearanceSettings();
 
     /// <summary>打开同步与安全设置对话框，返回 true 表示用户已保存</summary>

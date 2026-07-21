@@ -144,6 +144,17 @@ public partial class AppearanceSettingsWindow : Window
         ApplyCallback?.Invoke(_settings);
     }
 
+    private void OnCloseToTrayChanged(object sender, RoutedEventArgs e)
+    {
+        if (_suppressEvents)
+        {
+            return;
+        }
+
+        _settings.CloseToTray = CloseToTrayBox.IsChecked == true;
+        ApplyCallback?.Invoke(_settings);
+    }
+
     private void UpdateLayoutCards()
     {
         var accentBrush = (Brush)FindResource("Brush.Accent");
@@ -220,8 +231,9 @@ public partial class AppearanceSettingsWindow : Window
         // 填充主题下拉框
         RefreshThemeOptions();
 
-        // 选中当前主题
+        // 选中当前主题 / 托盘选项（程序化赋值时抑制事件）
         _suppressEvents = true;
+        CloseToTrayBox.IsChecked = _settings.CloseToTray;
         var currentIdx = _options.FindIndex(o => o.Value == _settings.ActiveTheme);
         ThemeBox.SelectedIndex = currentIdx >= 0 ? currentIdx : 0;
         _suppressEvents = false;
@@ -595,6 +607,7 @@ public partial class AppearanceSettingsWindow : Window
             _settings.ToolbarPlacement = imported.ToolbarPlacement;
             _settings.ToolbarVisibilityMode = imported.ToolbarVisibilityMode;
             _settings.StatusBarVisibilityMode = imported.StatusBarVisibilityMode;
+            _settings.CloseToTray = imported.CloseToTray;
             _settings.ActiveTheme = imported.ActiveTheme;
             _settings.ThemeContentFonts = new Dictionary<string, string>(
                 imported.ThemeContentFonts ?? new Dictionary<string, string>(),
@@ -627,6 +640,7 @@ public partial class AppearanceSettingsWindow : Window
         _settings.H4Size = H4SizeSlider.Value;
         _settings.H5Size = H5SizeSlider.Value;
         _settings.H6Size = H6SizeSlider.Value;
+        _settings.CloseToTray = CloseToTrayBox.IsChecked == true;
     }
 
     /// <summary>改字体：保存到当前主题并即时预览</summary>

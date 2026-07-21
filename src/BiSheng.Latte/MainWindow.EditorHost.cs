@@ -203,6 +203,7 @@ public partial class MainWindow
         _vm.ApplyToolbarPlacement(settings.ToolbarPlacement);
         ApplyToolbarVisibilityBehavior(settings.ToolbarVisibilityMode);
         ApplyStatusBarVisibilityBehavior(settings.StatusBarVisibilityMode);
+        _vm.UpdateCloseWindowTooltip(settings.CloseToTray);
 
         LogHelper.Debug("外观设置已应用: 主题={0}, 字体={1}, 行高={2}, 正文={3}pt",
             settings.ActiveTheme,

@@ -9,6 +9,7 @@ public partial class AboutWindow : Window
     private readonly AppUpdateService _updates;
     private readonly SyncService _sync;
     private readonly ImageSyncService _imageSync;
+    private readonly Action? _prepareForUpdateRestart;
     private AppUpdateCheckResult? _pendingUpdate;
     private bool _busy;
 
@@ -16,11 +17,13 @@ public partial class AboutWindow : Window
     public AboutWindow(
         AppUpdateService updates,
         SyncService sync,
-        ImageSyncService imageSync)
+        ImageSyncService imageSync,
+        Action? prepareForUpdateRestart = null)
     {
         _updates = updates;
         _sync = sync;
         _imageSync = imageSync;
+        _prepareForUpdateRestart = prepareForUpdateRestart;
         InitializeComponent();
         VersionText.Text = $"版本 {_updates.GetCurrentVersionDisplay()}";
     }
@@ -106,7 +109,23 @@ public partial class AboutWindow : Window
                 StatusText.Text = $"正在下载更新… {p}%";
             });
 
-            await _updates.DownloadAndApplyAsync(_pendingUpdate, progress);
+            await _updates.DownloadAndApplyAsync(
+                _pendingUpdate,
+                progress,
+                beforeRestart: () =>
+                {
+                    // Velopack 会结束进程；先落盘并释放托盘，避免托盘幽灵进程
+                    StatusText.Text = "即将重启以完成更新…";
+                    _prepareForUpdateRestart?.Invoke();
+                    try
+                    {
+                        Composition.LatteHost.Dispose();
+                    }
+                    catch (Exception ex)
+                    {
+                        LogHelper.Error("更新前释放服务失败", ex);
+                    }
+                });
             StatusText.Text = "即将重启以完成更新…";
         }
         catch (Exception ex)

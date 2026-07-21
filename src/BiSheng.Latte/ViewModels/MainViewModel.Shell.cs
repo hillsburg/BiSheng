@@ -96,6 +96,15 @@ public partial class MainViewModel
     [ObservableProperty]
     private string _maximizeButtonTooltip = "最大化";
 
+    [ObservableProperty]
+    private string _closeWindowTooltip = "关闭到托盘";
+
+    /// <summary>根据外观设置刷新关闭按钮提示</summary>
+    public void UpdateCloseWindowTooltip(bool closeToTray)
+    {
+        CloseWindowTooltip = closeToTray ? "关闭到托盘" : "退出";
+    }
+
     /// <summary>折叠前缓存的列宽</summary>
     private double _storedFolderColumnWidth = 220;
 
