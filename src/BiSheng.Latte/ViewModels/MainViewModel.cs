@@ -198,7 +198,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
         _ = navigationFilterBridge;
         _navigationLayoutMode.IsTreeMode = IsTreeMode;
 
-        _changeTracker.OnChangeRecorded += ScheduleDebouncedPush;
+        _changeTracker.OnChangeRecorded += OnLocalChangeRecorded;
 
         FolderTree.SetNoteList(NoteList);
         FolderTree.SetNavigation(Navigation);
@@ -450,6 +450,14 @@ public partial class MainViewModel : ObservableObject, IDisposable
         IsFolderPanelVisible = !IsFolderPanelVisible;
     }
 
+    private void OnLocalChangeRecorded()
+    {
+        System.Windows.Application.Current?.Dispatcher.BeginInvoke(
+            DispatcherPriority.Background,
+            RefreshConnectionDisplay);
+        ScheduleDebouncedPush();
+    }
+
     private void ScheduleDebouncedPush()
     {
         if (Volatile.Read(ref _disposeState) != 0 || !AuthService.IsConnected)
@@ -485,7 +493,7 @@ public partial class MainViewModel : ObservableObject, IDisposable
             return;
         }
 
-        _changeTracker.OnChangeRecorded -= ScheduleDebouncedPush;
+        _changeTracker.OnChangeRecorded -= OnLocalChangeRecorded;
         AuthService.PropertyChanged -= OnAuthServicePropertyChanged;
 
         lock (_debouncedPushLock)

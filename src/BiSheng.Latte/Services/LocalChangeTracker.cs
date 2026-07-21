@@ -84,6 +84,13 @@ public class LocalChangeTracker
         _editJournal?.Append(db, entityType, entityId, action, journalTitle, journalContent);
     }
 
+    /// <summary>当前待推送变更条数（供连接状态徽章展示）</summary>
+    public int GetPendingChangeCount()
+    {
+        using var db = _dbFactory();
+        return db.PendingChanges.Count();
+    }
+
     /// <summary>通知同步引擎有新的本地变更（与 ApplyPendingChange 分离，便于合并事务后只触发一次）</summary>
     public void NotifyChangeRecorded() => OnChangeRecorded?.Invoke();
 }

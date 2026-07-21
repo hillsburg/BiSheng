@@ -195,7 +195,8 @@ public partial class MainWindow : Window, IMainWindowHost
             {
                 _vm.UpdateConnectionStatus();
                 await _vm.RestartSyncEngineAsync();
-            })
+            },
+            getPendingChangeCount: () => _vm.GetPendingChangeCount())
         { Owner = this }.ShowDialog();
     }
 
