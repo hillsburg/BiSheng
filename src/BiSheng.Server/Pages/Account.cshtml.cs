@@ -3,12 +3,14 @@ using BiSheng.Server.Data;
 using BiSheng.Server.Services;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
+using Microsoft.AspNetCore.RateLimiting;
 using Microsoft.EntityFrameworkCore;
 
 namespace BiSheng.Server.Pages;
 
 /// <summary>账号安全：改密、重绑 TOTP</summary>
 [AdminPanelAuthorize]
+[EnableRateLimiting("login")]
 public class AccountModel : PageModel
 {
     private readonly AppDbContext _db;
@@ -52,6 +54,12 @@ public class AccountModel : PageModel
 
     /// <summary>错误提示</summary>
     public string ErrorMessage { get; set; } = string.Empty;
+
+    /// <summary>是否因 POST 过频被限流</summary>
+    public bool IsRateLimited => Request.Query.ContainsKey("rateLimited");
+
+    /// <summary>限流提示文案（与登录页同策略：5 次/分钟/IP）</summary>
+    public const string RateLimitMessage = "操作过于频繁，请约 1 分钟后再试";
 
     /// <summary>改密：当前密码</summary>
     [BindProperty]
