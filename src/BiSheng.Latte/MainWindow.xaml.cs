@@ -211,7 +211,16 @@ public partial class MainWindow : Window, IMainWindowHost
 
     bool? IMainWindowHost.ShowConflictDialog()
     {
-        return new ConflictResolutionDialog(_vm.SyncEngine) { Owner = this }.ShowDialog();
+        try
+        {
+            return new ConflictResolutionDialog(_vm.SyncEngine) { Owner = this }.ShowDialog();
+        }
+        catch (Exception ex)
+        {
+            LogHelper.Error("打开冲突解决对话框失败", ex);
+            AppDialog.Error($"无法打开冲突解决窗口：\n{ex.Message}", "冲突解决");
+            return false;
+        }
     }
 
     void IMainWindowHost.ShowBackupManagerDialog() =>
