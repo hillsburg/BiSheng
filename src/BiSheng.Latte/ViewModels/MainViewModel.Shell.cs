@@ -31,6 +31,13 @@ public partial class MainViewModel
     [ObservableProperty]
     private double _outlineColumnWidth = 240;
 
+    /// <summary>大纲列最小宽度：可见时 150，隐藏时 0（否则无法收起列）</summary>
+    public const double OutlineColumnMinWidthWhenVisible = 150;
+
+    /// <summary>绑定到大纲 ColumnDefinition.MinWidth</summary>
+    public double OutlineColumnMinWidth =>
+        IsOutlinePanelVisible ? OutlineColumnMinWidthWhenVisible : 0;
+
     /// <summary>归纳模式下合并树列宽</summary>
     [ObservableProperty]
     private double _mergedTreeColumnWidth = 280;
@@ -240,7 +247,10 @@ public partial class MainViewModel
 
             _storedFolderColumnWidth = Clamp(layout.FolderColumnWidth, 120, 400);
             _storedNoteColumnWidth = Clamp(layout.NoteColumnWidth, 180, 400);
-            _storedOutlineColumnWidth = Clamp(layout.OutlineColumnWidth, 150, 400);
+            _storedOutlineColumnWidth = Clamp(
+                layout.OutlineColumnWidth,
+                OutlineColumnMinWidthWhenVisible,
+                400);
             _storedMergedTreeColumnWidth = Clamp(layout.MergedTreeColumnWidth, 200, 500);
 
             if (treeMode)
@@ -262,6 +272,7 @@ public partial class MainViewModel
 
             IsFolderPanelVisible = layout.FolderPanelVisible;
             IsOutlinePanelVisible = layout.OutlinePanelVisible;
+            OnPropertyChanged(nameof(OutlineColumnMinWidth));
 
             _navigationPublisher.NotifyLayoutRebuild();
 
@@ -550,9 +561,9 @@ public partial class MainViewModel
 
         if (value)
         {
-            if (OutlineColumnWidth <= 0)
+            if (OutlineColumnWidth < OutlineColumnMinWidthWhenVisible)
             {
-                OutlineColumnWidth = _storedOutlineColumnWidth;
+                OutlineColumnWidth = Math.Max(_storedOutlineColumnWidth, OutlineColumnMinWidthWhenVisible);
             }
 
             OutlineRefreshRequested?.Invoke();
@@ -565,6 +576,28 @@ public partial class MainViewModel
             }
 
             OutlineColumnWidth = 0;
+        }
+
+        OnPropertyChanged(nameof(OutlineColumnMinWidth));
+    }
+
+    partial void OnOutlineColumnWidthChanged(double value)
+    {
+        if (_isApplyingLayout)
+        {
+            return;
+        }
+
+        // 可见时不允许拖到最小宽度以下（Grid MinWidth 为主，此处兜底并记忆）
+        if (IsOutlinePanelVisible && value > 0 && value < OutlineColumnMinWidthWhenVisible)
+        {
+            OutlineColumnWidth = OutlineColumnMinWidthWhenVisible;
+            return;
+        }
+
+        if (value >= OutlineColumnMinWidthWhenVisible)
+        {
+            _storedOutlineColumnWidth = value;
         }
     }
 
