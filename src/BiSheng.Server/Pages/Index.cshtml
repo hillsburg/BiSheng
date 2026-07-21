@@ -193,6 +193,48 @@
     </div>
 </div>
 
+<div class="section-card" style="margin-bottom:20px;animation-delay:0.22s;">
+    <div class="section-header">
+        <h2 class="section-title">服务端更新</h2>
+        <form method="post" asp-page-handler="CheckUpdate" style="margin:0;">
+            <button type="submit" class="btn btn-secondary btn-sm">检查更新</button>
+        </form>
+    </div>
+    <p style="font-size:13px;color:var(--text-muted);margin-bottom:12px;line-height:1.5;">
+        仅查询 GitHub Releases，不会自动下载或安装。升级请用 <code style="font-family:var(--font-mono);font-size:12px;">upgrade-bisheng.sh</code>。
+    </p>
+    @if (Model.UpdateCheck != null)
+    {
+        var uc = Model.UpdateCheck;
+        var alertClass = uc.Availability switch
+        {
+            ServerUpdateAvailability.UpdateAvailable => "alert-success",
+            ServerUpdateAvailability.Failed => "alert-danger",
+            _ => ""
+        };
+        <div class="alert @alertClass" style="@(string.IsNullOrEmpty(alertClass) ? "background:var(--bg);border:1px solid var(--border);color:var(--text-secondary);" : null)">
+            <div>@uc.Message</div>
+            <div style="margin-top:8px;font-size:12.5px;opacity:0.9;">
+                当前 <strong>@uc.CurrentVersion</strong>
+                @if (!string.IsNullOrEmpty(uc.LatestVersion))
+                {
+                    <text> · 最新 <strong>@uc.LatestVersion</strong></text>
+                }
+            </div>
+            <div style="margin-top:10px;display:flex;gap:10px;flex-wrap:wrap;">
+                @if (!string.IsNullOrEmpty(uc.DownloadUrl))
+                {
+                    <a href="@uc.DownloadUrl" class="btn btn-primary btn-sm" rel="noopener" target="_blank">下载 @uc.AssetName</a>
+                }
+                @if (!string.IsNullOrEmpty(uc.ReleaseUrl))
+                {
+                    <a href="@uc.ReleaseUrl" class="btn btn-secondary btn-sm" rel="noopener" target="_blank">打开 Release</a>
+                }
+            </div>
+        </div>
+    }
+</div>
+
 <div class="section-card">
     <div class="section-header">
         <h2 class="section-title">近期 API Key</h2>

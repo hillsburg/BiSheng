@@ -26,10 +26,14 @@ public class SetupMiddleware
             return;
         }
 
-        // 未初始化：只允许 /admin/setup 路径
+        // 未初始化：只允许 setup、健康检查与静态资源
         var path = context.Request.Path.Value?.ToLower() ?? string.Empty;
 
-        if (path == "/admin/setup" || path.StartsWith("/_content") || path.StartsWith("/css") || path.StartsWith("/js"))
+        if (path == "/admin/setup"
+            || path == "/health"
+            || path.StartsWith("/_content")
+            || path.StartsWith("/css")
+            || path.StartsWith("/js"))
         {
             await _next(context);
             return;

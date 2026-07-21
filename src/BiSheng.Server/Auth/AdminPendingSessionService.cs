@@ -20,11 +20,17 @@ public sealed class AdminPendingSessionService
     /// <summary>初始化待完成会话 Cookie 名</summary>
     public const string SetupCookieName = "bisheng.admin.pending-setup";
 
+    /// <summary>重绑 TOTP 待完成会话 Cookie 名</summary>
+    public const string TotpRebindCookieName = "bisheng.admin.pending-totp-rebind";
+
     /// <summary>登录待会话默认有效期</summary>
     public static readonly TimeSpan LoginPendingTimeToLive = TimeSpan.FromMinutes(5);
 
     /// <summary>初始化待会话默认有效期</summary>
     public static readonly TimeSpan SetupPendingTimeToLive = TimeSpan.FromMinutes(15);
+
+    /// <summary>重绑 TOTP 待会话默认有效期</summary>
+    public static readonly TimeSpan TotpRebindPendingTimeToLive = TimeSpan.FromMinutes(15);
 
     private static readonly JsonSerializerOptions JsonOptions = new()
     {
@@ -33,8 +39,10 @@ public sealed class AdminPendingSessionService
 
     private readonly ITimeLimitedDataProtector _loginProtector;
     private readonly ITimeLimitedDataProtector _setupProtector;
+    private readonly ITimeLimitedDataProtector _totpRebindProtector;
     private readonly bool _secureAlways;
     private readonly ConcurrentDictionary<string, SetupPendingState> _setupStates = new();
+    private readonly ConcurrentDictionary<string, TotpRebindPendingState> _totpRebindStates = new();
 
     /// <summary>构造短时会话服务</summary>
     public AdminPendingSessionService(
@@ -44,6 +52,8 @@ public sealed class AdminPendingSessionService
         _loginProtector = dataProtection.CreateProtector("BiSheng.Admin.PendingLogin.v1")
             .ToTimeLimitedDataProtector();
         _setupProtector = dataProtection.CreateProtector("BiSheng.Admin.PendingSetup.v1")
+            .ToTimeLimitedDataProtector();
+        _totpRebindProtector = dataProtection.CreateProtector("BiSheng.Admin.PendingTotpRebind.v1")
             .ToTimeLimitedDataProtector();
         _secureAlways = configuration.GetValue("Cookies:SecureAlways", false);
     }
@@ -163,6 +173,76 @@ public sealed class AdminPendingSessionService
         httpContext.Response.Cookies.Delete(SetupCookieName, BuildDeleteOptions());
     }
 
+    /// <summary>
+    /// 重绑 TOTP：密码（及旧码）验证通过后写入待完成会话；
+    /// Cookie 仅含 SessionId，新密钥明文仅存内存。
+    /// </summary>
+    public void SetTotpRebindPending(HttpContext httpContext, TotpRebindPendingState state)
+    {
+        CleanupExpiredTotpRebindStates();
+        var sessionId = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+        state.ExpiresUtc = DateTime.UtcNow.Add(TotpRebindPendingTimeToLive);
+        _totpRebindStates[sessionId] = state;
+
+        var cookiePayload = new SetupPendingCookiePayload { SessionId = sessionId };
+        WriteCookie(
+            httpContext,
+            TotpRebindCookieName,
+            Protect(_totpRebindProtector, cookiePayload, TotpRebindPendingTimeToLive),
+            TotpRebindPendingTimeToLive);
+    }
+
+    /// <summary>读取并校验重绑 TOTP 待会话</summary>
+    public bool TryGetTotpRebindPending(HttpContext httpContext, out TotpRebindPendingState state)
+    {
+        state = default!;
+        if (!httpContext.Request.Cookies.TryGetValue(TotpRebindCookieName, out var cookie)
+            || string.IsNullOrEmpty(cookie))
+        {
+            return false;
+        }
+
+        if (!TryUnprotect(_totpRebindProtector, cookie, out SetupPendingCookiePayload? data)
+            || data == null
+            || string.IsNullOrWhiteSpace(data.SessionId))
+        {
+            ClearTotpRebindPending(httpContext);
+            return false;
+        }
+
+        if (!_totpRebindStates.TryGetValue(data.SessionId, out var stored)
+            || stored.ExpiresUtc < DateTime.UtcNow
+            || stored.UserId == Guid.Empty
+            || string.IsNullOrWhiteSpace(stored.TotpSecret))
+        {
+            if (!string.IsNullOrWhiteSpace(data.SessionId))
+            {
+                _totpRebindStates.TryRemove(data.SessionId, out _);
+            }
+
+            ClearTotpRebindPending(httpContext);
+            return false;
+        }
+
+        state = stored;
+        return true;
+    }
+
+    /// <summary>清除重绑 TOTP 待会话</summary>
+    public void ClearTotpRebindPending(HttpContext httpContext)
+    {
+        if (httpContext.Request.Cookies.TryGetValue(TotpRebindCookieName, out var cookie)
+            && !string.IsNullOrEmpty(cookie)
+            && TryUnprotect(_totpRebindProtector, cookie, out SetupPendingCookiePayload? data)
+            && data != null
+            && !string.IsNullOrWhiteSpace(data.SessionId))
+        {
+            _totpRebindStates.TryRemove(data.SessionId, out _);
+        }
+
+        httpContext.Response.Cookies.Delete(TotpRebindCookieName, BuildDeleteOptions());
+    }
+
     /// <summary>加密并附加过期时间</summary>
     private static string Protect<T>(ITimeLimitedDataProtector protector, T payload, TimeSpan ttl)
     {
@@ -221,6 +301,19 @@ public sealed class AdminPendingSessionService
             }
         }
     }
+
+    /// <summary>清理过期的重绑 TOTP 内存态</summary>
+    private void CleanupExpiredTotpRebindStates()
+    {
+        var now = DateTime.UtcNow;
+        foreach (var pair in _totpRebindStates)
+        {
+            if (pair.Value.ExpiresUtc < now)
+            {
+                _totpRebindStates.TryRemove(pair.Key, out _);
+            }
+        }
+    }
 }
 
 /// <summary>登录第二步（TOTP）所需的短时载荷</summary>
@@ -233,7 +326,7 @@ public sealed class LoginPendingPayload
     public string Username { get; set; } = string.Empty;
 }
 
-/// <summary>初始化 Cookie 载荷：仅不透明会话 ID</summary>
+/// <summary>初始化 / 重绑 Cookie 载荷：仅不透明会话 ID</summary>
 public sealed class SetupPendingCookiePayload
 {
     /// <summary>服务端内存会话键</summary>
@@ -253,6 +346,19 @@ public sealed class SetupPendingState
     public string DeviceName { get; set; } = string.Empty;
 
     /// <summary>服务端生成的 TOTP 明文密钥（仅存内存至完成/过期）</summary>
+    public string TotpSecret { get; set; } = string.Empty;
+
+    /// <summary>过期时间（UTC）</summary>
+    public DateTime ExpiresUtc { get; set; }
+}
+
+/// <summary>重绑 TOTP 第二步内存态</summary>
+public sealed class TotpRebindPendingState
+{
+    /// <summary>当前管理员用户 ID</summary>
+    public Guid UserId { get; set; }
+
+    /// <summary>新生成的 TOTP 明文密钥</summary>
     public string TotpSecret { get; set; } = string.Empty;
 
     /// <summary>过期时间（UTC）</summary>

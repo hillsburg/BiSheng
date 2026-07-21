@@ -71,6 +71,12 @@ public static class ServiceCollectionExtensions
         // 管理后台两步登录 / 初始化的短时加密会话
         services.AddSingleton<AdminPendingSessionService>();
         services.AddSingleton<TotpSecretProtector>();
+        services.Configure<ServerUpdateOptions>(
+            configuration.GetSection(ServerUpdateOptions.SectionName));
+        services.AddHttpClient<ServerUpdateCheckService>(client =>
+        {
+            client.Timeout = TimeSpan.FromSeconds(15);
+        });
         services.AddSignalR();
         services.AddProblemDetails();
         services.AddControllers()

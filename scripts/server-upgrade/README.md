@@ -33,7 +33,7 @@ sudo DOWNLOAD_URL='https://github.com/hillsburg/BiSheng/releases/download/v0.1.0
 3. 校验 SHA-256（若提供 `EXPECTED_SHA256`）
 4. 解压到临时目录；归档当前程序文件为 `pre-upgrade-*.tar.gz`
 5. 覆盖程序文件，**保留** `bisheng.db*`、`uploads/`、`appsettings.Production.json`、`data-protection-keys/`、`backup/`
-6. `systemctl start` + 访问 `HEALTH_URL`（默认 `/admin/login`）
+6. `systemctl start` + 访问 `HEALTH_URL`（默认 `/health`）
 7. 失败时尝试用 `pre-upgrade-*.tar.gz` 回滚程序文件
 
 ## 与发版产物

@@ -1,8 +1,9 @@
 using System.Globalization;
-using System.Reflection;
 using BiSheng.Server.Auth;
 using BiSheng.Server.Data;
 using BiSheng.Server.Data.Entities;
+using BiSheng.Server.Services;
+using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.Data.Sqlite;
 using Microsoft.EntityFrameworkCore;
@@ -14,11 +15,16 @@ public class IndexModel : PageModel
 {
     private readonly AppDbContext _db;
     private readonly IConfiguration _configuration;
+    private readonly ServerUpdateCheckService _updateCheck;
 
-    public IndexModel(AppDbContext db, IConfiguration configuration)
+    public IndexModel(
+        AppDbContext db,
+        IConfiguration configuration,
+        ServerUpdateCheckService updateCheck)
     {
         _db = db;
         _configuration = configuration;
+        _updateCheck = updateCheck;
     }
 
     public string AdminUsername { get; set; } = string.Empty;
@@ -31,11 +37,25 @@ public class IndexModel : PageModel
     public string? LastClientActivityDisplay { get; set; }
     public DateTime? SetupTime { get; set; }
     public List<ApiKey> RecentKeys { get; set; } = new();
+    public ServerUpdateCheckResult? UpdateCheck { get; set; }
 
     public async Task OnGetAsync()
     {
+        await LoadDashboardAsync();
+    }
+
+    /// <summary>检查 GitHub Releases 是否有新服务端包（只读）</summary>
+    public async Task<IActionResult> OnPostCheckUpdateAsync(CancellationToken cancellationToken)
+    {
+        await LoadDashboardAsync();
+        UpdateCheck = await _updateCheck.CheckAsync(cancellationToken);
+        return Page();
+    }
+
+    private async Task LoadDashboardAsync()
+    {
         AdminUsername = User.Identity?.Name ?? "Unknown";
-        ServerVersion = ResolveServerVersion();
+        ServerVersion = ServerUpdateCheckService.GetCurrentVersion();
         NoteCount = await _db.Notes.CountAsync(n => !n.IsDeleted);
         DeletedNoteCount = await _db.Notes.CountAsync(n => n.IsDeleted);
         FolderCount = await _db.Folders.CountAsync(f => !f.IsDeleted);
@@ -48,20 +68,6 @@ public class IndexModel : PageModel
             .OrderByDescending(k => k.LastUsedAt ?? k.CreatedAt)
             .Take(5)
             .ToListAsync();
-    }
-
-    private static string ResolveServerVersion()
-    {
-        var asm = Assembly.GetExecutingAssembly();
-        var info = asm.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
-        if (!string.IsNullOrWhiteSpace(info))
-        {
-            // 去掉可能附带的 git commit 后缀
-            var plus = info.IndexOf('+');
-            return plus > 0 ? info[..plus] : info;
-        }
-
-        return asm.GetName().Version?.ToString(3) ?? "unknown";
     }
 
     private string ResolveDatabaseSizeDisplay()

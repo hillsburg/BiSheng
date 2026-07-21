@@ -1,0 +1,177 @@
+@page "/admin/account"
+@model AccountModel
+@{
+    ViewData["Title"] = "账号安全";
+}
+
+<style>
+    .page-header {
+        margin-bottom: 28px;
+        animation: fadeUp 0.5s ease-out both;
+    }
+
+    .page-title {
+        font-family: var(--font-display);
+        font-size: 28px;
+        font-weight: 400;
+        letter-spacing: -0.03em;
+        margin-bottom: 4px;
+    }
+
+    .page-subtitle {
+        font-size: 14px;
+        color: var(--text-muted);
+    }
+
+    .section-card {
+        background: var(--bg-elevated);
+        border: 1px solid var(--border);
+        border-radius: var(--radius-lg);
+        padding: 32px 36px;
+        margin-bottom: 20px;
+        animation: fadeUp 0.5s ease-out both;
+    }
+
+    .section-card:nth-of-type(1) { animation-delay: 0.05s; }
+    .section-card:nth-of-type(2) { animation-delay: 0.1s; }
+
+    .section-title {
+        font-family: var(--font-display);
+        font-size: 16px;
+        font-weight: 500;
+        margin-bottom: 6px;
+    }
+
+    .section-desc {
+        font-size: 13px;
+        color: var(--text-muted);
+        margin-bottom: 20px;
+        line-height: 1.5;
+    }
+
+    .totp-section {
+        text-align: center;
+        margin: 8px 0 20px;
+        padding: 24px;
+        background: var(--bg);
+        border: 1px solid var(--border);
+        border-radius: var(--radius);
+    }
+
+    .totp-section img {
+        display: block;
+        margin: 0 auto 16px;
+        border-radius: 8px;
+        background: #fff;
+        padding: 8px;
+    }
+
+    .totp-secret-text {
+        font-family: var(--font-mono);
+        font-size: 12px;
+        color: var(--text-muted);
+        word-break: break-all;
+        user-select: all;
+    }
+
+    .totp-input {
+        font-family: var(--font-mono);
+        font-size: 20px;
+        letter-spacing: 0.4em;
+        text-align: center;
+    }
+
+    .form-actions {
+        display: flex;
+        gap: 10px;
+        flex-wrap: wrap;
+        margin-top: 8px;
+    }
+</style>
+
+<div class="page-header">
+    <h1 class="page-title">账号安全</h1>
+    <p class="page-subtitle">@Model.Username · 修改密码与两步验证</p>
+</div>
+
+@if (!string.IsNullOrEmpty(Model.SuccessMessage))
+{
+    <div class="alert alert-success">@Model.SuccessMessage</div>
+}
+
+@if (!string.IsNullOrEmpty(Model.ErrorMessage))
+{
+    <div class="alert alert-danger">@Model.ErrorMessage</div>
+}
+
+<div class="section-card">
+    <h2 class="section-title">修改密码</h2>
+    <p class="section-desc">修改后下次登录使用新密码。不影响已签发的 API Key。</p>
+    <form method="post" asp-page-handler="ChangePassword">
+        <div class="form-group">
+            <label>当前密码</label>
+            <input asp-for="CurrentPassword" type="password" required autocomplete="current-password" />
+        </div>
+        <div class="form-group">
+            <label>新密码</label>
+            <input asp-for="NewPassword" type="password" required minlength="6" autocomplete="new-password" placeholder="至少 6 个字符" />
+        </div>
+        <div class="form-group">
+            <label>确认新密码</label>
+            <input asp-for="ConfirmNewPassword" type="password" required minlength="6" autocomplete="new-password" />
+        </div>
+        <button type="submit" class="btn btn-primary">更新密码</button>
+    </form>
+</div>
+
+<div class="section-card">
+    <h2 class="section-title">重绑两步验证（TOTP）</h2>
+    <p class="section-desc">
+        丢失 Authenticator 或更换手机时使用。完成后请删除 App 中的旧条目。
+        @(Model.IsDevelopment ? "开发环境无需输入当前验证码。" : "需验证当前密码与当前验证码。")
+    </p>
+
+    @if (Model.IsTotpRebindStep)
+    {
+        <div class="totp-section">
+            @if (!string.IsNullOrEmpty(Model.QrCodeUrl))
+            {
+                <img src="@Model.QrCodeUrl" alt="新 TOTP 二维码" width="180" height="180" />
+            }
+            <p style="font-size:13px;color:var(--text-secondary);margin-bottom:8px;">用 Authenticator 扫描上方二维码，或手动输入：</p>
+            <div class="totp-secret-text">@Model.DisplayTotpSecret</div>
+        </div>
+
+        <form method="post" asp-page-handler="ConfirmTotpRebind">
+            <div class="form-group">
+                <label>新验证码</label>
+                <input asp-for="NewTotpCode" required autofocus maxlength="6" pattern="[0-9]{6}"
+                       inputmode="numeric" autocomplete="one-time-code" class="totp-input"
+                       placeholder="6 位数字" />
+            </div>
+            <div class="form-actions">
+                <button type="submit" class="btn btn-primary">确认绑定</button>
+                <a href="/admin/account?resetTotp=1" class="btn btn-secondary">取消</a>
+            </div>
+        </form>
+    }
+    else
+    {
+        <form method="post" asp-page-handler="StartTotpRebind">
+            <div class="form-group">
+                <label>当前密码</label>
+                <input asp-for="TotpCurrentPassword" type="password" required autocomplete="current-password" />
+            </div>
+            @if (!Model.IsDevelopment)
+            {
+                <div class="form-group">
+                    <label>当前验证码</label>
+                    <input asp-for="CurrentTotpCode" required maxlength="6" pattern="[0-9]{6}"
+                           inputmode="numeric" autocomplete="one-time-code" class="totp-input"
+                           placeholder="6 位数字" />
+                </div>
+            }
+            <button type="submit" class="btn btn-primary">生成新二维码</button>
+        </form>
+    }
+</div>
