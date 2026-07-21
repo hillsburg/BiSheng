@@ -100,8 +100,11 @@
                     <!--  3: 编辑器  -->
                     <ColumnDefinition Width="*" MinWidth="400" />
                     <ColumnDefinition Width="Auto" />
-                    <!--  5: 大纲  -->
-                    <ColumnDefinition Width="{Binding OutlineColumnWidth, Mode=TwoWay, Converter={StaticResource DoubleToGridLength}}" />
+                    <!--  5: 大纲（可见时 MinWidth 约束分隔条，隐藏时为 0）  -->
+                    <ColumnDefinition
+                        Width="{Binding OutlineColumnWidth, Mode=TwoWay, Converter={StaticResource DoubleToGridLength}}"
+                        MinWidth="{Binding OutlineColumnMinWidth}"
+                        MaxWidth="400" />
                 </Grid.ColumnDefinitions>
 
                 <!--  导航左侧工具栏  -->
