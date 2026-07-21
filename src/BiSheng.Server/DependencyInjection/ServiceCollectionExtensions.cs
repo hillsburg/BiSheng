@@ -73,6 +73,8 @@ public static class ServiceCollectionExtensions
         services.AddSingleton<TotpSecretProtector>();
         services.Configure<ServerUpdateOptions>(
             configuration.GetSection(ServerUpdateOptions.SectionName));
+        services.Configure<CompatibilityOptions>(
+            configuration.GetSection(CompatibilityOptions.SectionName));
         services.AddHttpClient<ServerUpdateCheckService>(client =>
         {
             client.Timeout = TimeSpan.FromSeconds(15);

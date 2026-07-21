@@ -19,9 +19,21 @@ namespace BiSheng.Server.Tests.Fixtures;
 public sealed class BiShengWebAppFactory : WebApplicationFactory<Program>
 {
     private SqliteConnection _connection = null!;
+    private readonly Action<IServiceCollection>? _configureTestServices;
 
     /// <summary>共享的 in-memory 连接，工厂与种子 DbContext 共用</summary>
     public SqliteConnection Connection => _connection;
+
+    /// <summary>默认测试宿主</summary>
+    public BiShengWebAppFactory()
+    {
+    }
+
+    /// <summary>附加额外测试服务配置（如覆盖 CompatibilityOptions）</summary>
+    public BiShengWebAppFactory(Action<IServiceCollection> configureTestServices)
+    {
+        _configureTestServices = configureTestServices;
+    }
 
     protected override void ConfigureWebHost(IWebHostBuilder builder)
     {
@@ -43,6 +55,7 @@ public sealed class BiShengWebAppFactory : WebApplicationFactory<Program>
             }
 
             services.AddDbContext<AppDbContext>(opt => opt.UseSqlite(_connection));
+            _configureTestServices?.Invoke(services);
         });
     }
 
