@@ -1,9 +1,11 @@
 using System.IO;
 using System.Net.Http;
+using System.Reflection;
 using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using BiSheng.Latte.Models;
+using BiSheng.Shared.Compatibility;
 using CommunityToolkit.Mvvm.ComponentModel;
 
 namespace BiSheng.Latte.Services;
@@ -15,6 +17,11 @@ namespace BiSheng.Latte.Services;
 public partial class AuthService : ObservableObject
 {
     private const string DpapiPrefix = "dpapi:";
+    private static readonly JsonSerializerOptions ProbeJsonOptions = new()
+    {
+        PropertyNameCaseInsensitive = true
+    };
+
     private readonly string _configFilePath;
 
     /// <summary>服务器地址（为 null 或空时表示离线模式）</summary>
@@ -113,7 +120,8 @@ public partial class AuthService : ObservableObject
     }
 
     /// <summary>
-    /// 探测指定凭据能否连通服务器；不修改当前 AuthService 的地址、Key 与验证状态
+    /// 探测指定凭据能否连通服务器；不修改当前 AuthService 的地址、Key 与验证状态。
+    /// 会校验服务端 minClient 与本地要求的 minServer。
     /// </summary>
     public static async Task<ConnectionProbeResult> ProbeConnectionAsync(string serverUrl, string apiKey)
     {
@@ -124,8 +132,10 @@ public partial class AuthService : ObservableObject
 
         try
         {
+            var clientVersion = GetClientProductVersion();
             using var http = new HttpClient { BaseAddress = new Uri(serverUrl.Trim()), Timeout = TimeSpan.FromSeconds(10) };
             http.DefaultRequestHeaders.Add("X-Api-Key", apiKey.Trim());
+            http.DefaultRequestHeaders.Add(ProtocolCompatibility.ClientVersionHeaderName, clientVersion);
 
             var response = await http.GetAsync("/api/auth/verify-key");
             if (!response.IsSuccessStatusCode)
@@ -134,13 +144,51 @@ public partial class AuthService : ObservableObject
             }
 
             var json = await response.Content.ReadAsStringAsync();
-            var verifyResult = JsonSerializer.Deserialize<VerifyKeyResult>(json);
-            return new ConnectionProbeResult(true, verifyResult?.username);
+            var verifyResult = JsonSerializer.Deserialize<VerifyKeyResponse>(json, ProbeJsonOptions);
+            if (verifyResult == null || !verifyResult.Valid)
+            {
+                return ConnectionProbeResult.Failed;
+            }
+
+            if (!verifyResult.Compatible)
+            {
+                return ConnectionProbeResult.Incompatible(
+                    verifyResult.CompatibilityMessage
+                    ?? $"客户端版本过旧，请升级至 {verifyResult.MinClient} 及以上。",
+                    verifyResult.Username,
+                    verifyResult.ServerVersion);
+            }
+
+            var serverVersion = verifyResult.ServerVersion;
+            if (!string.IsNullOrWhiteSpace(serverVersion)
+                && !VersionComparer.IsAtLeast(serverVersion, ProtocolCompatibility.MinServerRequiredByClient))
+            {
+                return ConnectionProbeResult.Incompatible(
+                    $"服务端版本过旧（当前 {serverVersion}，需要 ≥ {ProtocolCompatibility.MinServerRequiredByClient}）。请升级 BiSheng Server。",
+                    verifyResult.Username,
+                    serverVersion);
+            }
+
+            return new ConnectionProbeResult(true, verifyResult.Username, true, null, serverVersion);
         }
         catch
         {
             return ConnectionProbeResult.Failed;
         }
+    }
+
+    /// <summary>当前 Latte 产品版本（InformationalVersion）</summary>
+    public static string GetClientProductVersion()
+    {
+        var asm = Assembly.GetExecutingAssembly();
+        var info = asm.GetCustomAttribute<AssemblyInformationalVersionAttribute>()?.InformationalVersion;
+        if (!string.IsNullOrWhiteSpace(info))
+        {
+            var plus = info.IndexOf('+');
+            return plus > 0 ? info[..plus] : info;
+        }
+
+        return asm.GetName().Version?.ToString(3) ?? "0.0.0";
     }
 
     /// <summary>保存配置到文件（API Key 必须 DPAPI 加密成功，禁止明文回退）</summary>
@@ -253,13 +301,23 @@ public partial class AuthService : ObservableObject
         }
     }
 
-    private record VerifyKeyResult(bool valid, string? userId, string? username, string? deviceName);
-
     private record ClientConfig(string? ServerUrl, string? ApiKey, bool SyncEnabled = true);
 
     /// <summary>连接探测结果（不写入 AuthService）</summary>
-    public readonly record struct ConnectionProbeResult(bool Success, string? Username)
+    public readonly record struct ConnectionProbeResult(
+        bool Success,
+        string? Username,
+        bool Compatible = true,
+        string? Message = null,
+        string? ServerVersion = null)
     {
         public static ConnectionProbeResult Failed => new(false, null);
+
+        /// <summary>API Key 有效但协议版本不匹配</summary>
+        public static ConnectionProbeResult Incompatible(
+            string message,
+            string? username,
+            string? serverVersion) =>
+            new(false, username, Compatible: false, Message: message, ServerVersion: serverVersion);
     }
 }
