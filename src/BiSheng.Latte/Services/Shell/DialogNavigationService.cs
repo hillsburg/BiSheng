@@ -171,12 +171,15 @@ public sealed class DialogNavigationService : IDialogNavigationService
     /// <inheritdoc />
     public void OpenConflictDialog()
     {
-        if (_getHost?.Invoke()?.ShowConflictDialog() != true)
+        try
         {
-            return;
+            _ = _getHost?.Invoke()?.ShowConflictDialog();
         }
-
-        _refreshConflictsAfterDialog?.Invoke();
+        finally
+        {
+            // 无论确定 / 取消 / 标题栏关闭，都按库内未解决数刷新徽章
+            _refreshConflictsAfterDialog?.Invoke();
+        }
     }
 
     /// <inheritdoc />
