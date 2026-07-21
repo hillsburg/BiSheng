@@ -96,6 +96,9 @@ public class AppearanceSettings
     /// <summary>状态栏显示：固定 / 隐藏</summary>
     public StatusBarVisibilityMode StatusBarVisibilityMode { get; set; } = StatusBarVisibilityMode.Fixed;
 
+    /// <summary>关闭主窗口时最小化到系统托盘（托盘菜单可退出）</summary>
+    public bool CloseToTray { get; set; } = true;
+
     // ===== 主题 =====
 
     /// <summary>活动主题名称：System（跟随系统）/ Light / Dark / Latte / 用户自定义主题名</summary>

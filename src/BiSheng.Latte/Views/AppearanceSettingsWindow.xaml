@@ -689,6 +689,23 @@
                                 </StackPanel>
                             </Border>
                         </Grid>
+
+                        <TextBlock
+                            Margin="0,20,0,6"
+                            FontSize="15"
+                            FontWeight="SemiBold"
+                            Foreground="{DynamicResource Brush.Text}"
+                            Text="窗口与托盘" />
+                        <TextBlock
+                            Margin="0,0,0,12"
+                            FontSize="12"
+                            Foreground="{DynamicResource Brush.TextMuted}"
+                            Text="关闭主窗口时的行为。取消勾选后，关闭按钮将直接退出应用。" />
+                        <CheckBox
+                            x:Name="CloseToTrayBox"
+                            Content="关闭窗口时最小化到系统托盘"
+                            Checked="OnCloseToTrayChanged"
+                            Unchecked="OnCloseToTrayChanged" />
                     </StackPanel>
                 </ScrollViewer>
             </TabItem>

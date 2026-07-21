@@ -17,6 +17,9 @@ public partial class App : Application
 
     protected override async void OnStartup(StartupEventArgs e)
     {
+        // 托盘驻留时隐藏主窗口不应退出进程
+        ShutdownMode = ShutdownMode.OnExplicitShutdown;
+
         // 先迁移 exe 旁旧数据，再初始化日志与打开数据库
         LatteLegacyMigrationResult? migration = null;
         Exception? migrationError = null;
@@ -62,7 +65,12 @@ public partial class App : Application
 
         LogHelper.Debug("本地数据库已就绪");
 
+        var tray = new TrayIconService();
+        tray.Initialize();
+
         var mainWindow = new MainWindow(LatteHost.GetRequiredService<ViewModels.MainViewModel>());
+        mainWindow.AttachTray(tray);
+        MainWindow = mainWindow;
         mainWindow.Show();
 
         base.OnStartup(e);

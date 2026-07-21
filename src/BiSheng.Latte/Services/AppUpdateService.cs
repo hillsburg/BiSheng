@@ -144,9 +144,11 @@ public sealed class AppUpdateService
     }
 
     /// <summary>下载并应用更新后重启（须已确认）</summary>
+    /// <param name="beforeRestart">下载完成后、进程重启前的回调（释放托盘 / DI 等）</param>
     public async Task DownloadAndApplyAsync(
         AppUpdateCheckResult result,
         IProgress<int>? progress = null,
+        Action? beforeRestart = null,
         CancellationToken cancellationToken = default)
     {
         if (result.Availability != AppUpdateAvailability.UpdateAvailable
@@ -161,6 +163,7 @@ public sealed class AppUpdateService
             progress == null ? null : p => progress.Report(p),
             cancelToken: cancellationToken).ConfigureAwait(false);
 
+        beforeRestart?.Invoke();
         result.Manager.ApplyUpdatesAndRestart(result.UpdateInfo);
     }
 

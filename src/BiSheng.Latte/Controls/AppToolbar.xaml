@@ -172,7 +172,7 @@
                     Foreground="{DynamicResource Brush.Danger}"
                     Style="{StaticResource ToolbarButton}">
                     <Button.ToolTip>
-                        <ToolTip Content="关闭" FontFamily="{StaticResource UIFont}" />
+                        <ToolTip Content="{Binding CloseWindowTooltip}" FontFamily="{StaticResource UIFont}" />
                     </Button.ToolTip>
                 </Button>
             </StackPanel>
@@ -217,7 +217,7 @@
                     Foreground="{DynamicResource Brush.Danger}"
                     Style="{StaticResource ToolbarButtonVertical}">
                     <Button.ToolTip>
-                        <ToolTip Content="关闭" FontFamily="{StaticResource UIFont}" />
+                        <ToolTip Content="{Binding CloseWindowTooltip}" FontFamily="{StaticResource UIFont}" />
                     </Button.ToolTip>
                 </Button>
                 <Button
