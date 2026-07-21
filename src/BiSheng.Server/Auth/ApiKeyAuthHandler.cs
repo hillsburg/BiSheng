@@ -64,6 +64,21 @@ public class ApiKeyAuthHandler : AuthenticationHandler<AuthenticationSchemeOptio
             return AuthenticateResult.Fail("Invalid or inactive API key.");
         }
 
+        // 节流更新 LastUsedAt，避免每次请求都写库
+        var now = DateTime.UtcNow;
+        if (key.LastUsedAt is null || now - key.LastUsedAt.Value > TimeSpan.FromMinutes(5))
+        {
+            key.LastUsedAt = now;
+            try
+            {
+                await db.SaveChangesAsync();
+            }
+            catch (Exception ex)
+            {
+                Logger.LogDebug(ex, "更新 ApiKey.LastUsedAt 失败（不影响认证）");
+            }
+        }
+
         var claims = new[]
         {
             new Claim(ClaimTypes.NameIdentifier, key.UserId.ToString()),

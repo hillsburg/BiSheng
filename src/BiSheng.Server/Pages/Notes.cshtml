@@ -1,7 +1,7 @@
 @page "/admin/notes"
 @model NotesModel
 @{
-    ViewData["Title"] = "笔记管理";
+    ViewData["Title"] = "浏览笔记";
 }
 
 <style>
@@ -247,7 +247,7 @@
 
 <div class="page-header">
     <h1 class="page-title">笔记</h1>
-    <span class="page-count">@Model.Notes.Count 篇</span>
+    <span class="page-count">只读浏览 · @Model.Notes.Count 篇</span>
 </div>
 
 <form method="get" class="filter-bar" id="filterForm">

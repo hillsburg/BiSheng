@@ -66,6 +66,12 @@ public class LoginModel : PageModel
     /// <summary>是否刚完成初始化</summary>
     public bool SetupDone => Request.Query.ContainsKey("setup");
 
+    /// <summary>初始化时生成的首把 API Key（TempData Peek，登录后带到 Keys 页）</summary>
+    public string? SetupApiKey { get; private set; }
+
+    /// <summary>首把 Key 的设备名</summary>
+    public string? SetupDeviceName { get; private set; }
+
     /// <summary>是否因登录 POST 过频被限流（由 OnRejected 重定向带入）</summary>
     public bool IsRateLimited => Request.Query.ContainsKey("rateLimited");
 
@@ -82,6 +88,14 @@ public class LoginModel : PageModel
     {
         if (User.Identity?.IsAuthenticated == true)
         {
+            // 已登录仍保留首 Key，直接带到 Keys 页展示
+            if (TempData.Peek("NewApiKey") is string)
+            {
+                TempData.Keep("NewApiKey");
+                TempData.Keep("DeviceName");
+                return Redirect("/admin/keys");
+            }
+
             return Redirect("/admin");
         }
 
@@ -92,6 +106,7 @@ public class LoginModel : PageModel
             return Redirect("/admin/login");
         }
 
+        CaptureSetupApiKeyFromTempData();
         RestoreTotpStepFromSession();
         return Page();
     }
@@ -99,6 +114,9 @@ public class LoginModel : PageModel
     /// <summary>POST：第一步验密或第二步验 TOTP</summary>
     public async Task<IActionResult> OnPostAsync()
     {
+        // POST 重渲染时继续保留首 Key，避免登录过程中 TempData 丢失
+        CaptureSetupApiKeyFromTempData();
+
         // ===== 第二步：仅信任服务端 pending Cookie，忽略客户端伪造的 userId =====
         if (_pendingSessions.TryGetLoginPending(HttpContext, out var pending))
         {
@@ -220,7 +238,31 @@ public class LoginModel : PageModel
 
         await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal);
 
+        // 首装 Key：Keep TempData 并带到 Keys 页一次性展示
+        if (TempData.Peek("NewApiKey") is string)
+        {
+            TempData.Keep("NewApiKey");
+            TempData.Keep("DeviceName");
+            return Redirect("/admin/keys");
+        }
+
         return Redirect("/admin");
+    }
+
+    /// <summary>从 TempData Peek 首把 Key，并 Keep 以便登录后仍可展示</summary>
+    private void CaptureSetupApiKeyFromTempData()
+    {
+        SetupApiKey = TempData.Peek("NewApiKey") as string;
+        SetupDeviceName = TempData.Peek("DeviceName") as string;
+        if (SetupApiKey != null)
+        {
+            TempData.Keep("NewApiKey");
+        }
+
+        if (SetupDeviceName != null)
+        {
+            TempData.Keep("DeviceName");
+        }
     }
 
     /// <summary>从加密 Cookie 恢复第二步展示状态</summary>

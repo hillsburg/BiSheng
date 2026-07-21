@@ -77,11 +77,29 @@
         <h1 class="login-brand">BiSheng</h1>
         <p class="login-subtitle">管理员登录</p>
 
-        @if (Model.SetupDone)
+        @if (Model.SetupDone || !string.IsNullOrEmpty(Model.SetupApiKey))
         {
             <div class="alert alert-success">
-                初始化完成！请登录后在 <a href="/admin/keys" style="font-weight:600;">API Keys</a> 页面获取您的密钥。
+                初始化完成！请立即复制下方 API Key（仅显示一次），登录后会再带到 Keys 页确认一次。
             </div>
+            @if (!string.IsNullOrEmpty(Model.SetupApiKey))
+            {
+                <div class="new-key-alert" style="margin-bottom:20px;">
+                    @if (!string.IsNullOrEmpty(Model.SetupDeviceName))
+                    {
+                        <p>设备：@Model.SetupDeviceName</p>
+                    }
+                    else
+                    {
+                        <p>请立即复制保存，此值仅显示一次</p>
+                    }
+                    <div class="key-value" id="setupApiKeyValue">@Model.SetupApiKey</div>
+                    <button type="button" class="btn btn-secondary btn-sm" style="margin-top:10px;"
+                            onclick="navigator.clipboard.writeText(document.getElementById('setupApiKeyValue').textContent).then(()=>this.textContent='已复制').catch(()=>{})">
+                        复制 Key
+                    </button>
+                </div>
+            }
         }
 
         @if (Model.IsRateLimited)
