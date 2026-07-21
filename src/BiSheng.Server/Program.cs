@@ -153,6 +153,34 @@ app.MapControllers();
 app.MapRazorPages();
 app.MapHub<BiSheng.Server.Hubs.SyncHub>("/hubs/sync");
 
+// 运维探活：不要求登录；未 Setup 时亦放行（见 SetupMiddleware）
+app.MapGet("/health", async (AppDbContext db, CancellationToken cancellationToken) =>
+{
+    try
+    {
+        var canConnect = await db.Database.CanConnectAsync(cancellationToken);
+        if (!canConnect)
+        {
+            return Results.Json(
+                new { status = "unhealthy", database = "unreachable" },
+                statusCode: StatusCodes.Status503ServiceUnavailable);
+        }
+
+        return Results.Ok(new
+        {
+            status = "ok",
+            database = "ok",
+            version = BiSheng.Server.Services.ServerUpdateCheckService.GetCurrentVersion()
+        });
+    }
+    catch (Exception)
+    {
+        return Results.Json(
+            new { status = "unhealthy", database = "error" },
+            statusCode: StatusCodes.Status503ServiceUnavailable);
+    }
+}).AllowAnonymous();
+
 app.Run();
 
 // 暴露给 WebApplicationFactory<Program> 用于集成测试

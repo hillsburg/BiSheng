@@ -6,7 +6,7 @@ set -euo pipefail
 
 BISHENG_HOME="${BISHENG_HOME:-/opt/bisheng}"
 SERVICE_NAME="${SERVICE_NAME:-bisheng}"
-HEALTH_URL="${HEALTH_URL:-http://127.0.0.1:8090/admin/login}"
+HEALTH_URL="${HEALTH_URL:-http://127.0.0.1:8090/health}"
 SKIP_BACKUP="${SKIP_BACKUP:-0}"
 SKIP_HEALTH="${SKIP_HEALTH:-0}"
 EXPECTED_SHA256="${EXPECTED_SHA256:-}"
@@ -172,7 +172,7 @@ usage() {
   SKIP_BACKUP=1      跳过备份（仅调试）
   SKIP_HEALTH=1      跳过健康检查
   SERVICE_NAME       systemd 单元名（默认 bisheng）
-  HEALTH_URL         健康检查 URL（默认 http://127.0.0.1:8090/admin/login）
+  HEALTH_URL         健康检查 URL（默认 http://127.0.0.1:8090/health）
   BACKUP_SCRIPT      backup-bisheng.sh 路径
 EOF
 }
