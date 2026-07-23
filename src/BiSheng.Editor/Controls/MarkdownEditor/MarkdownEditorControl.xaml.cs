@@ -193,6 +193,7 @@ namespace BiSheng.Editor.Controls.MarkdownEditor
 
             var textView = Editor.TextArea.TextView;
             textView.LineSpacing = LineSpacing;
+            textView.LinkTextForegroundBrush = _theme.LinkColor;
             textView.LineTransformers.Add(_lineTransformer);
             textView.BackgroundRenderers.Add(_backgroundRenderer);
             textView.ElementGenerators.Add(_imageRenderer);
@@ -559,6 +560,10 @@ namespace BiSheng.Editor.Controls.MarkdownEditor
             // 光标颜色：通过 Caret.CaretBrush 设置
             var caretClr = (theme.CaretColor is SolidColorBrush caretScb) ? caretScb.Color : Colors.Black;
             Editor.TextArea.Caret.CaretBrush = new SolidColorBrush(caretClr);
+
+            // AvalonEdit 内置 URL/邮箱识别使用 LinkTextForegroundBrush（默认纯蓝），
+            // 须与主题 LinkColor 同步，否则外观「链接颜色」对裸链接不生效。
+            Editor.TextArea.TextView.LinkTextForegroundBrush = theme.LinkColor;
 
             if (_documentModel != null)
             {
