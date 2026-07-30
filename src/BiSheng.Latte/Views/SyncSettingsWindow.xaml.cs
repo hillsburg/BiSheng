@@ -198,8 +198,10 @@ public partial class SyncSettingsWindow : Window
 
             ShowStatus(
                 testingSavedCredentials
-                    ? $"连接成功！用户: {result.Username ?? "—"}"
-                    : $"连接成功（未保存的配置）。用户: {result.Username ?? "—"}",
+                    ? $"连接成功！用户: {result.Username ?? "—"}" +
+                      (string.IsNullOrWhiteSpace(result.ServerVersion) ? "" : $" · 服务端 {result.ServerVersion}")
+                    : $"连接成功（未保存的配置）。用户: {result.Username ?? "—"}" +
+                      (string.IsNullOrWhiteSpace(result.ServerVersion) ? "" : $" · 服务端 {result.ServerVersion}"),
                 ThemeBrushKeys.Success);
         }
         else
@@ -211,9 +213,11 @@ public partial class SyncSettingsWindow : Window
             }
 
             ShowStatus(
-                testingSavedCredentials
-                    ? "连接失败，请检查服务器地址和 API Key"
-                    : "连接失败（当前输入尚未保存，不影响已保存配置的状态）",
+                !string.IsNullOrWhiteSpace(result.Message)
+                    ? result.Message
+                    : testingSavedCredentials
+                        ? "连接失败，请检查服务器地址和 API Key"
+                        : "连接失败（当前输入尚未保存，不影响已保存配置的状态）",
                 ThemeBrushKeys.Danger);
         }
 

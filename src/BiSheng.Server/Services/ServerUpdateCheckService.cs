@@ -3,6 +3,7 @@ using System.Reflection;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using System.Text.RegularExpressions;
+using BiSheng.Shared.Compatibility;
 using Microsoft.Extensions.Options;
 
 namespace BiSheng.Server.Services;
@@ -265,52 +266,12 @@ public sealed class ServerUpdateCheckService
     }
 
     /// <summary>去掉 tag 前缀 v/V</summary>
-    public static string NormalizeVersion(string tagOrVersion)
-    {
-        var s = tagOrVersion.Trim();
-        if (s.StartsWith('v') || s.StartsWith('V'))
-        {
-            s = s[1..];
-        }
-
-        return s;
-    }
+    public static string NormalizeVersion(string tagOrVersion) =>
+        VersionComparer.Normalize(tagOrVersion);
 
     /// <summary>比较语义化版本；无法解析时按字符串序。返回 &gt;0 当前更新，0 相等，&lt;0 有新版</summary>
-    public static int CompareVersions(string current, string latest)
-    {
-        if (Version.TryParse(PadVersion(current), out var c)
-            && Version.TryParse(PadVersion(latest), out var l))
-        {
-            return c.CompareTo(l);
-        }
-
-        return string.Compare(
-            NormalizeVersion(current),
-            NormalizeVersion(latest),
-            StringComparison.OrdinalIgnoreCase);
-    }
-
-    private static string PadVersion(string version)
-    {
-        var parts = NormalizeVersion(version).Split('.', StringSplitOptions.RemoveEmptyEntries);
-        while (parts.Length < 3)
-        {
-            Array.Resize(ref parts, parts.Length + 1);
-            parts[^1] = "0";
-        }
-
-        for (var i = 0; i < parts.Length && i < 4; i++)
-        {
-            var dash = parts[i].IndexOf('-');
-            if (dash > 0)
-            {
-                parts[i] = parts[i][..dash];
-            }
-        }
-
-        return string.Join('.', parts.Take(4));
-    }
+    public static int CompareVersions(string current, string latest) =>
+        VersionComparer.Compare(current, latest);
 
     /// <summary>与设计文档 §2.3 对齐的精简清单（仅消费 server 段）</summary>
     internal sealed class UpdateManifestDto

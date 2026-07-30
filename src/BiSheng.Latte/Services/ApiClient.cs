@@ -4,6 +4,7 @@ using System.Net.Http.Headers;
 using System.Net.Http.Json;
 using System.Net.Sockets;
 using System.Text.Json;
+using BiSheng.Shared.Compatibility;
 
 namespace BiSheng.Latte.Services;
 
@@ -179,6 +180,11 @@ public class ApiClient : IDisposable
         {
             http.DefaultRequestHeaders.Add("X-Api-Key", _authService.ApiKey);
         }
+
+        http.DefaultRequestHeaders.Remove(ProtocolCompatibility.ClientVersionHeaderName);
+        http.DefaultRequestHeaders.Add(
+            ProtocolCompatibility.ClientVersionHeaderName,
+            AuthService.GetClientProductVersion());
     }
 
     private static async Task<T?> ReadJsonAsync<T>(HttpResponseMessage response)
