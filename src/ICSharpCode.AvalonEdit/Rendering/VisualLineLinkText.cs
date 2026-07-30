@@ -60,10 +60,17 @@ namespace ICSharpCode.AvalonEdit.Rendering
 		/// <inheritdoc/>
 		public override TextRun CreateTextRun(int startVisualColumn, ITextRunConstructionContext context)
 		{
-			this.TextRunProperties.SetForegroundBrush(context.TextView.LinkTextForegroundBrush);
-			this.TextRunProperties.SetBackgroundBrush(context.TextView.LinkTextBackgroundBrush);
-			if (context.TextView.LinkTextUnderline)
-				this.TextRunProperties.SetTextDecorations(TextDecorations.Underline);
+			// DocumentColorizingTransformer 可能先把语法区标成 Transparent（Markdown 折叠 URL）。
+			// 若此处无条件写回 LinkTextForegroundBrush，折叠会失效且始终显示默认蓝色。
+			bool concealed = this.TextRunProperties.ForegroundBrush == System.Windows.Media.Brushes.Transparent
+			                 || this.TextRunProperties.FontHintingEmSize <= 0.1;
+			if (!concealed)
+			{
+				this.TextRunProperties.SetForegroundBrush(context.TextView.LinkTextForegroundBrush);
+				this.TextRunProperties.SetBackgroundBrush(context.TextView.LinkTextBackgroundBrush);
+				if (context.TextView.LinkTextUnderline)
+					this.TextRunProperties.SetTextDecorations(TextDecorations.Underline);
+			}
 			return base.CreateTextRun(startVisualColumn, context);
 		}
 
