@@ -1,3 +1,4 @@
+using BiSheng.Latte.Services;
 using Velopack;
 
 namespace BiSheng.Latte;
@@ -13,7 +14,14 @@ public static class Program
     {
         VelopackApp.Build().Run();
 
-        var app = new App();
+        // Velopack 钩子之后再抢单实例锁：安装/更新钩子进程不能被当成第二个实例拦掉
+        using var instanceGuard = SingleInstanceGuard.TryAcquire();
+        if (instanceGuard == null)
+        {
+            return;
+        }
+
+        var app = new App { InstanceGuard = instanceGuard };
         app.InitializeComponent();
         app.Run();
     }

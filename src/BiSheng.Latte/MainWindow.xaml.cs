@@ -65,7 +65,8 @@ public partial class MainWindow : Window, IMainWindowHost
 
         _shutdownInProgress = true;
 
-        _vm.CaptureLayout().Save();
+        // 每一步单独兜底：_shutdownInProgress 已置位，任何一步抛出都会让窗口永远关不掉
+        RunShutdownStep("保存窗口布局", () => _vm.CaptureLayout().Save());
 
         if (_themeWatcher != null)
         {
@@ -73,7 +74,7 @@ public partial class MainWindow : Window, IMainWindowHost
             _themeWatcher = null;
         }
 
-        _vm.Editor.ForceSave(NoteEditor.Text, checkpointRevision: true);
+        RunShutdownStep("退出前保存笔记", () => _vm.Editor.ForceSave(NoteEditor.Text, checkpointRevision: true));
 
         try
         {
@@ -85,9 +86,10 @@ public partial class MainWindow : Window, IMainWindowHost
         }
 
         // 关闭同步引擎后再备份，便于 VACUUM 获取数据库独占访问
-        LocalDatabaseBackupService.TryRunScheduledBackup(DataSafetySettings.Load(), onExit: true);
+        RunShutdownStep("退出备份", () =>
+            LocalDatabaseBackupService.TryRunScheduledBackup(DataSafetySettings.Load(), onExit: true));
 
-        _tray?.Dispose();
+        RunShutdownStep("释放托盘图标", () => _tray?.Dispose());
         _tray = null;
 
         // Closing 回调内不能同步 Close()；延后到当前关闭流程结束后再关窗并退出应用
@@ -98,6 +100,19 @@ public partial class MainWindow : Window, IMainWindowHost
             Close();
             Application.Current?.Shutdown();
         });
+    }
+
+    /// <summary>执行一个退出步骤；失败只记日志，不中断后续步骤</summary>
+    private static void RunShutdownStep(string stepName, Action step)
+    {
+        try
+        {
+            step();
+        }
+        catch (Exception ex)
+        {
+            LogHelper.Error($"退出流程「{stepName}」失败", ex);
+        }
     }
 
     private void HideToTray()
@@ -125,6 +140,12 @@ public partial class MainWindow : Window, IMainWindowHost
     /// <summary>从托盘恢复主窗口</summary>
     public void ShowFromTray()
     {
+        // 退出流程中（同步、备份）收到另一实例的激活请求时不再重新显示窗口
+        if (_shutdownInProgress)
+        {
+            return;
+        }
+
         ShowInTaskbar = true;
         Show();
         if (WindowState == WindowState.Minimized)

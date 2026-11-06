@@ -156,7 +156,15 @@ public partial class SyncSettingsWindow : Window
 
         if (_onSyncEnabledChanged != null)
         {
-            await _onSyncEnabledChanged();
+            try
+            {
+                await _onSyncEnabledChanged();
+            }
+            catch (Exception ex)
+            {
+                // 开关与凭据已保存成功，回调失败只影响状态刷新，不回滚开关
+                LogHelper.Error("同步开关回调失败", ex);
+            }
         }
 
         UpdateConnectionStatusDisplay();
