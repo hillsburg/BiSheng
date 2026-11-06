@@ -1,5 +1,6 @@
 @page "/admin/login"
 @model LoginModel
+@inject Microsoft.Extensions.Options.IOptions<BiSheng.Server.Auth.WebAuthnOptions> WebAuthn
 @{
     Layout = "_Layout";
     ViewData["Title"] = "管理员登录";
@@ -43,6 +44,21 @@
         width: 100%;
         padding: 11px 20px;
         margin-top: 4px;
+    }
+
+    .passkey-login {
+        margin-top: 16px;
+        padding-top: 16px;
+        border-top: 1px solid var(--border);
+    }
+
+    .passkey-login .btn {
+        width: 100%;
+        padding: 11px 20px;
+    }
+
+    .passkey-login p:empty {
+        display: none;
     }
 
     .login-footer {
@@ -162,6 +178,14 @@
                 </div>
                 <button type="submit" class="btn btn-primary">@(Model.IsDevelopment ? "登录" : "下一步")</button>
             </form>
+
+            @if (WebAuthn.Value.Enabled)
+            {
+                <div class="passkey-login">
+                    <button type="button" class="btn btn-secondary" id="passkey-login">使用通行密钥登录</button>
+                    <p id="passkey-message" role="status" aria-live="polite"></p>
+                </div>
+            }
         }
 
         <div class="login-footer">
@@ -169,3 +193,9 @@
         </div>
     </div>
 </div>
+
+@if (WebAuthn.Value.Enabled && !Model.IsTotpStep)
+{
+    <script src="~/js/passkey-common.js" asp-append-version="true" defer></script>
+    <script src="~/js/passkey-login.js" asp-append-version="true" defer></script>
+}

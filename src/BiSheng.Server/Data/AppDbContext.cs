@@ -18,6 +18,8 @@ public class AppDbContext : DbContext
     public DbSet<ServerImage> Images => Set<ServerImage>();
     public DbSet<NoteRevision> NoteRevisions => Set<NoteRevision>();
 
+    public DbSet<PasskeyCredential> PasskeyCredentials => Set<PasskeyCredential>();
+
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {
         base.OnModelCreating(modelBuilder);
@@ -26,6 +28,14 @@ public class AppDbContext : DbContext
         modelBuilder.Entity<User>(e =>
         {
             e.HasIndex(u => u.Username).IsUnique();
+            e.Property(u => u.AuthVersion).HasDefaultValue(1L);
+        });
+
+        // 凭据 ID 全局唯一，避免同一把凭据被绑定到不同账号。
+        modelBuilder.Entity<PasskeyCredential>(e =>
+        {
+            e.HasIndex(k => k.CredentialId).IsUnique();
+            e.HasOne(k => k.User).WithMany().HasForeignKey(k => k.UserId).OnDelete(DeleteBehavior.Cascade);
         });
 
         // Folder

@@ -44,6 +44,49 @@ public class AdminPendingSessionTests
         Assert.False(service.TryGetLoginPending(request, out _));
     }
 
+    [Fact]
+    public void LoginPending_ConsumedOrClearedCookieCannotBeReplayed()
+    {
+        var service = CreateSessionService();
+        var context = new DefaultHttpContext();
+        service.SetLoginPending(context, Guid.NewGuid(), "admin", 7);
+        var request = new DefaultHttpContext();
+        request.Request.Headers.Cookie = ExtractCookieHeader(context.Response.Headers.SetCookie.ToString());
+        Assert.True(service.TryGetLoginPending(request, out var state));
+        Assert.Equal(7, state.AuthVersion);
+        Assert.True(service.ConsumeLoginPending(request, state));
+        Assert.False(service.ConsumeLoginPending(request, state));
+        Assert.False(service.TryGetLoginPending(request, out _));
+    }
+
+    [Fact]
+    public void Pending_AttemptBudgetExpiryAndRestartAreEnforced()
+    {
+        var service = CreateSessionService();
+        var context = new DefaultHttpContext();
+        service.SetLoginPending(context, Guid.NewGuid(), "admin");
+        var request = new DefaultHttpContext();
+        request.Request.Headers.Cookie = ExtractCookieHeader(context.Response.Headers.SetCookie.ToString());
+        Assert.True(service.TryGetLoginPending(request, out var state));
+        for (var i = 0; i < 5; i++)
+        {
+            Assert.True(service.BeginAttempt(request, AdminPendingSessionService.LoginCookieName, state));
+        }
+        Assert.False(service.BeginAttempt(request, AdminPendingSessionService.LoginCookieName, state));
+        Assert.False(service.TryGetLoginPending(request, out _));
+        Assert.False(CreateSessionService().TryGetLoginPending(request, out _));
+
+        context = new DefaultHttpContext();
+        service.SetLoginPending(context, Guid.NewGuid(), "admin");
+        request = new DefaultHttpContext();
+        request.Request.Headers.Cookie = ExtractCookieHeader(context.Response.Headers.SetCookie.ToString());
+        Assert.True(service.TryGetLoginPending(request, out state));
+        Assert.False(CreateSessionService().TryGetLoginPending(request, out _));
+        state.ExpiresUtc = DateTime.UtcNow.AddSeconds(-1);
+        Assert.False(service.ConsumeLoginPending(request, state));
+        Assert.False(service.TryGetLoginPending(request, out _));
+    }
+
     /// <summary>无 pending Cookie 时，伪造 UserId + 正确 TOTP 不能签发管理 Cookie</summary>
     [Fact]
     public async Task Login_ForgedPendingUserId_WithoutSession_DoesNotSignIn()
@@ -98,6 +141,95 @@ public class AdminPendingSessionTests
         Assert.Equal(HttpStatusCode.Redirect, step2.StatusCode);
         Assert.Equal("/admin", step2.Headers.Location?.OriginalString);
         Assert.True(HasAuthCookie(step2));
+    }
+
+    [Fact]
+    public async Task PasswordChange_RevokesSessionAndPendingLogin_PreservesApiKey()
+    {
+        using var factory = new BiShengWebAppFactory();
+        var client = CreateClient(factory);
+        var second = CreateClient(factory);
+        var (apiKey, id, _, secret) = await SeedAdminAsync(factory, "admin", "Password1!");
+        async Task BeginLogin(HttpClient browser)
+        {
+            var token = await GetAntiforgeryTokenAsync(browser, "/admin/login");
+            var response = await browser.PostAsync("/admin/login", new FormUrlEncodedContent(new Dictionary<string, string>
+            {
+                ["__RequestVerificationToken"] = token, ["Username"] = "admin", ["Password"] = "Password1!"
+            }));
+            Assert.Equal(HttpStatusCode.OK, response.StatusCode);
+        }
+        await BeginLogin(client);
+        await BeginLogin(second);
+        var login = await client.PostAsync("/admin/login", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["__RequestVerificationToken"] = await GetAntiforgeryTokenAsync(client, "/admin/login"),
+            ["TotpCode"] = GenerateTotpCode(secret)
+        }));
+        Assert.Equal(HttpStatusCode.Redirect, login.StatusCode);
+        // Clone an issued cookie to verify server-side revocation rather than just browser deletion.
+        var stolen = factory.CreateClient(new WebApplicationFactoryClientOptions { AllowAutoRedirect = false, HandleCookies = false });
+        stolen.DefaultRequestHeaders.Add("Cookie", login.Headers.GetValues("Set-Cookie").Single(c => c.StartsWith("bisheng.admin=")).Split(';')[0]);
+        Assert.Equal(HttpStatusCode.OK, (await stolen.GetAsync("/admin/account")).StatusCode);
+        var changed = await client.PostAsync("/admin/account?handler=ChangePassword", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["__RequestVerificationToken"] = await GetAntiforgeryTokenAsync(client, "/admin/account"),
+            ["CurrentPassword"] = "Password1!", ["NewPassword"] = "NewPassword2!", ["ConfirmNewPassword"] = "NewPassword2!"
+        }));
+        Assert.Equal("/admin/login", changed.Headers.Location?.OriginalString);
+        Assert.Equal(HttpStatusCode.Redirect, (await stolen.GetAsync("/admin/account")).StatusCode);
+        var stalePending = await second.PostAsync("/admin/login", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["__RequestVerificationToken"] = await GetAntiforgeryTokenAsync(second, "/admin/login"),
+            ["TotpCode"] = GenerateTotpCode(secret)
+        }));
+        Assert.False(HasAuthCookie(stalePending));
+        using var keyRequest = new HttpRequestMessage(HttpMethod.Get, "/api/auth/verify-key");
+        keyRequest.Headers.Add("X-Api-Key", apiKey);
+        Assert.Equal(HttpStatusCode.OK, (await second.SendAsync(keyRequest)).StatusCode);
+        await using var db = factory.NewDbContext();
+        var user = await db.Users.SingleAsync(u => u.Id == id);
+        Assert.Equal(2, user.AuthVersion);
+        Assert.True(PasswordCredentialService.VerifyPassword("NewPassword2!", user.PasswordHash));
+    }
+
+    [Fact]
+    public async Task TotpRebind_RevokesOldCookieAndKeepsEncryptedNewSecret()
+    {
+        using var factory = new BiShengWebAppFactory();
+        var client = CreateClient(factory);
+        var (_, id, _, secret) = await SeedAdminAsync(factory, "admin", "Password1!");
+        var token = await GetAntiforgeryTokenAsync(client, "/admin/login");
+        await client.PostAsync("/admin/login", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["__RequestVerificationToken"] = token, ["Username"] = "admin", ["Password"] = "Password1!"
+        }));
+        await client.PostAsync("/admin/login", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["__RequestVerificationToken"] = await GetAntiforgeryTokenAsync(client, "/admin/login"),
+            ["TotpCode"] = GenerateTotpCode(secret)
+        }));
+        var begin = await client.PostAsync("/admin/account?handler=StartTotpRebind", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["__RequestVerificationToken"] = await GetAntiforgeryTokenAsync(client, "/admin/account"),
+            ["TotpCurrentPassword"] = "Password1!"
+        }));
+        var html = await begin.Content.ReadAsStringAsync();
+        var match = Regex.Match(html, "<div class=\"totp-secret-text\">([^<]+)</div>");
+        Assert.True(match.Success);
+        var newSecret = match.Groups[1].Value;
+        var confirm = await client.PostAsync("/admin/account?handler=ConfirmTotpRebind", new FormUrlEncodedContent(new Dictionary<string, string>
+        {
+            ["__RequestVerificationToken"] = await GetAntiforgeryTokenAsync(client, "/admin/account"),
+            ["NewTotpCode"] = GenerateTotpCode(newSecret)
+        }));
+        Assert.Equal("/admin/login", confirm.Headers.Location?.OriginalString);
+        Assert.Equal(HttpStatusCode.Redirect, (await client.GetAsync("/admin/account")).StatusCode);
+        await using var db = factory.NewDbContext();
+        var user = await db.Users.SingleAsync(u => u.Id == id);
+        Assert.True(TotpSecretProtector.IsProtected(user.TotpSecret));
+        Assert.NotNull(user.LastTotpTimeStep);
+        Assert.Equal(2, user.AuthVersion);
     }
 
     /// <summary>Setup：仅提交伪造 TotpSecret 不能完成初始化（无 pending 会话）</summary>

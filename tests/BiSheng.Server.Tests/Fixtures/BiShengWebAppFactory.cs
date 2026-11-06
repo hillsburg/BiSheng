@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Configuration;
 using System.Security.Cryptography;
 using System.Text;
 using BiSheng.Server.Data;
@@ -18,6 +19,9 @@ namespace BiSheng.Server.Tests.Fixtures;
 /// </summary>
 public sealed class BiShengWebAppFactory : WebApplicationFactory<Program>
 {
+    /// <summary>通行密钥集成测试使用独立测试域名，不影响默认测试宿主。</summary>
+    public bool EnablePasskeys { get; init; }
+
     private SqliteConnection _connection = null!;
 
     /// <summary>共享的 in-memory 连接，工厂与种子 DbContext 共用</summary>
@@ -29,6 +33,17 @@ public sealed class BiShengWebAppFactory : WebApplicationFactory<Program>
         _connection.Open();
 
         builder.UseEnvironment("Test");
+        if (EnablePasskeys)
+        {
+            builder.ConfigureAppConfiguration((_, configuration) => configuration.AddInMemoryCollection(
+                new Dictionary<string, string?>
+                {
+                    ["WebAuthn:Enabled"] = "true",
+                    ["WebAuthn:RpId"] = "localhost",
+                    ["WebAuthn:RpName"] = "Bisheng Tests",
+                    ["WebAuthn:Origins:0"] = "http://localhost"
+                }));
+        }
 
         builder.ConfigureTestServices(services =>
         {

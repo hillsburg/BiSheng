@@ -1,5 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
-using System.ComponentModel.DataAnnotations.Schema;
+using System.ComponentModel.DataAnnotations;
 
 namespace BiSheng.Server.Data.Entities;
 
@@ -19,6 +18,12 @@ public class User
     /// </summary>
     [Required]
     public string TotpSecret { get; set; } = string.Empty;
+
+    [ConcurrencyCheck]
+    public long AuthVersion { get; set; } = 1;
+    public long? LastTotpTimeStep { get; set; }
+    public int FailedAuthAttempts { get; set; }
+    public DateTime? AuthLockedUntilUtc { get; set; }
 
     public DateTime CreatedAt { get; set; } = DateTime.UtcNow;
 

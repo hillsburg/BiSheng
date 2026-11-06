@@ -1,366 +1,232 @@
-using System.Collections.Concurrent;
 using System.Security.Cryptography;
-using System.Text;
-using System.Text.Json;
 using Microsoft.AspNetCore.DataProtection;
-using Microsoft.Extensions.Options;
 
 namespace BiSheng.Server.Auth;
 
-/// <summary>
-/// 管理后台两步流程的短时会话：
-/// 登录待会话仍用 Data Protection Cookie；
-/// 初始化待会话仅在 Cookie 中放不透明 SessionId，密码哈希与 TOTP 明文只存服务端内存。
-/// </summary>
+/// <summary>保存单实例、有容量限制的短时授权状态；重启后待完成流程失效。</summary>
 public sealed class AdminPendingSessionService
 {
-    /// <summary>登录待 TOTP 会话 Cookie 名</summary>
     public const string LoginCookieName = "bisheng.admin.pending-login";
-
-    /// <summary>初始化待完成会话 Cookie 名</summary>
     public const string SetupCookieName = "bisheng.admin.pending-setup";
-
-    /// <summary>重绑 TOTP 待完成会话 Cookie 名</summary>
     public const string TotpRebindCookieName = "bisheng.admin.pending-totp-rebind";
-
-    /// <summary>登录待会话默认有效期</summary>
     public static readonly TimeSpan LoginPendingTimeToLive = TimeSpan.FromMinutes(5);
-
-    /// <summary>初始化待会话默认有效期</summary>
     public static readonly TimeSpan SetupPendingTimeToLive = TimeSpan.FromMinutes(15);
+    public static readonly TimeSpan TotpRebindPendingTimeToLive = TimeSpan.FromMinutes(5);
+    public const string PasskeyLoginCookieName = "bisheng.admin.passkey-login";
+    public const string PasskeyRegisterCookieName = "bisheng.admin.passkey-register";
 
-    /// <summary>重绑 TOTP 待会话默认有效期</summary>
-    public static readonly TimeSpan TotpRebindPendingTimeToLive = TimeSpan.FromMinutes(15);
+    private readonly Dictionary<string, PendingState> _states = new();
+    private readonly object _gate = new();
+    private readonly IDataProtectionProvider _protection;
+    private readonly bool _secure;
 
-    private static readonly JsonSerializerOptions JsonOptions = new()
+    /// <summary>保存单实例、有容量限制的短时授权状态；重启后待完成流程失效。</summary>
+    public AdminPendingSessionService(IDataProtectionProvider protection, IConfiguration configuration)
     {
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase
-    };
-
-    private readonly ITimeLimitedDataProtector _loginProtector;
-    private readonly ITimeLimitedDataProtector _setupProtector;
-    private readonly ITimeLimitedDataProtector _totpRebindProtector;
-    private readonly bool _secureAlways;
-    private readonly ConcurrentDictionary<string, SetupPendingState> _setupStates = new();
-    private readonly ConcurrentDictionary<string, TotpRebindPendingState> _totpRebindStates = new();
-
-    /// <summary>构造短时会话服务</summary>
-    public AdminPendingSessionService(
-        IDataProtectionProvider dataProtection,
-        IConfiguration configuration)
-    {
-        _loginProtector = dataProtection.CreateProtector("BiSheng.Admin.PendingLogin.v1")
-            .ToTimeLimitedDataProtector();
-        _setupProtector = dataProtection.CreateProtector("BiSheng.Admin.PendingSetup.v1")
-            .ToTimeLimitedDataProtector();
-        _totpRebindProtector = dataProtection.CreateProtector("BiSheng.Admin.PendingTotpRebind.v1")
-            .ToTimeLimitedDataProtector();
-        _secureAlways = configuration.GetValue("Cookies:SecureAlways", false);
+        _protection = protection;
+        _secure = configuration.GetValue("Cookies:SecureAlways", false);
     }
 
-    /// <summary>密码验证通过后写入登录待会话</summary>
-    public void SetLoginPending(HttpContext httpContext, Guid userId, string username)
+    /// <summary>保存密码验证后的登录授权及对应认证版本。</summary>
+    public void SetLoginPending(HttpContext context, Guid id, string username, long authVersion = 1) =>
+        Set(context, LoginCookieName, new LoginPendingPayload { UserId = id, Username = username, AuthVersion = authVersion }, LoginPendingTimeToLive);
+    /// <summary>读取尚未过期的登录授权，不消费状态。</summary>
+    public bool TryGetLoginPending(HttpContext context, out LoginPendingPayload state) => Get(context, LoginCookieName, out state);
+    /// <summary>成功登录前原子消费授权，禁止 Cookie 重放。</summary>
+    public bool ConsumeLoginPending(HttpContext context, LoginPendingPayload state) => Consume(context, LoginCookieName, state);
+    /// <summary>撤销登录授权并删除对应 Cookie。</summary>
+    public void ClearLoginPending(HttpContext context) => Clear(context, LoginCookieName);
+    /// <summary>保存初始化凭据，敏感信息仅保留在服务端内存。</summary>
+    public void SetSetupPending(HttpContext context, SetupPendingState state) => Set(context, SetupCookieName, state, SetupPendingTimeToLive);
+    /// <summary>读取尚未过期的初始化状态。</summary>
+    public bool TryGetSetupPending(HttpContext context, out SetupPendingState state) => Get(context, SetupCookieName, out state);
+    /// <summary>创建账号前原子消费初始化授权。</summary>
+    public bool ConsumeSetupPending(HttpContext context, SetupPendingState state) => Consume(context, SetupCookieName, state);
+    /// <summary>撤销初始化授权并删除对应 Cookie。</summary>
+    public void ClearSetupPending(HttpContext context) => Clear(context, SetupCookieName);
+    /// <summary>保存经过重新验证的重绑授权和新密钥。</summary>
+    public void SetTotpRebindPending(HttpContext context, TotpRebindPendingState state) => Set(context, TotpRebindCookieName, state, TotpRebindPendingTimeToLive);
+    /// <summary>读取尚未过期的重绑授权。</summary>
+    public bool TryGetTotpRebindPending(HttpContext context, out TotpRebindPendingState state) => Get(context, TotpRebindCookieName, out state);
+    /// <summary>更新密钥前原子消费重绑授权。</summary>
+    public bool ConsumeTotpRebindPending(HttpContext context, TotpRebindPendingState state) => Consume(context, TotpRebindCookieName, state);
+    /// <summary>撤销重绑授权并删除对应 Cookie。</summary>
+    public void ClearTotpRebindPending(HttpContext context) => Clear(context, TotpRebindCookieName);
+    /// <summary>保存匿名登录的 WebAuthn 挑战。</summary>
+    public void SetPasskeyLoginPending(HttpContext context, PasskeyLoginState state) =>
+        Set(context, PasskeyLoginCookieName, state, WebAuthnOptions.ChallengeTimeToLive);
+    /// <summary>原子提取并消费登录挑战；验证失败也不能重放。</summary>
+    public bool TakePasskeyLoginPending(HttpContext context, out PasskeyLoginState state) =>
+        Take(context, PasskeyLoginCookieName, out state);
+    /// <summary>保存已重新授权的绑定挑战。</summary>
+    public void SetPasskeyRegisterPending(HttpContext context, PasskeyRegisterState state) =>
+        Set(context, PasskeyRegisterCookieName, state, WebAuthnOptions.ChallengeTimeToLive);
+    /// <summary>原子提取并消费绑定挑战；验证失败也不能重放。</summary>
+    public bool TakePasskeyRegisterPending(HttpContext context, out PasskeyRegisterState state) =>
+        Take(context, PasskeyRegisterCookieName, out state);
+
+    /// <summary>在锁内扣减验证次数预算，避免并发绕过次数限制。</summary>
+    public bool BeginAttempt(HttpContext context, string name, PendingState expected)
     {
-        var payload = new LoginPendingPayload
+        lock (_gate)
         {
-            UserId = userId,
-            Username = username
-        };
-        WriteCookie(
-            httpContext,
-            LoginCookieName,
-            Protect(_loginProtector, payload, LoginPendingTimeToLive),
-            LoginPendingTimeToLive);
-    }
-
-    /// <summary>读取并校验登录待会话；过期或不存在返回 false</summary>
-    public bool TryGetLoginPending(HttpContext httpContext, out LoginPendingPayload payload)
-    {
-        payload = default!;
-        if (!httpContext.Request.Cookies.TryGetValue(LoginCookieName, out var cookie)
-            || string.IsNullOrEmpty(cookie))
-        {
-            return false;
-        }
-
-        if (!TryUnprotect(_loginProtector, cookie, out LoginPendingPayload? data)
-            || data == null
-            || data.UserId == Guid.Empty
-            || string.IsNullOrWhiteSpace(data.Username))
-        {
-            ClearLoginPending(httpContext);
-            return false;
-        }
-
-        payload = data;
-        return true;
-    }
-
-    /// <summary>清除登录待会话</summary>
-    public void ClearLoginPending(HttpContext httpContext)
-    {
-        httpContext.Response.Cookies.Delete(LoginCookieName, BuildDeleteOptions());
-    }
-
-    /// <summary>
-    /// 初始化第一步通过后写入待完成会话：
-    /// Cookie 仅含 SessionId；密码以哈希、TOTP 明文仅存内存。
-    /// </summary>
-    public void SetSetupPending(HttpContext httpContext, SetupPendingState state)
-    {
-        CleanupExpiredSetupStates();
-        var sessionId = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
-        state.ExpiresUtc = DateTime.UtcNow.Add(SetupPendingTimeToLive);
-        _setupStates[sessionId] = state;
-
-        var cookiePayload = new SetupPendingCookiePayload { SessionId = sessionId };
-        WriteCookie(
-            httpContext,
-            SetupCookieName,
-            Protect(_setupProtector, cookiePayload, SetupPendingTimeToLive),
-            SetupPendingTimeToLive);
-    }
-
-    /// <summary>读取并校验初始化待会话（内存态）</summary>
-    public bool TryGetSetupPending(HttpContext httpContext, out SetupPendingState state)
-    {
-        state = default!;
-        if (!httpContext.Request.Cookies.TryGetValue(SetupCookieName, out var cookie)
-            || string.IsNullOrEmpty(cookie))
-        {
-            return false;
-        }
-
-        if (!TryUnprotect(_setupProtector, cookie, out SetupPendingCookiePayload? data)
-            || data == null
-            || string.IsNullOrWhiteSpace(data.SessionId))
-        {
-            ClearSetupPending(httpContext);
-            return false;
-        }
-
-        if (!_setupStates.TryGetValue(data.SessionId, out var stored)
-            || stored.ExpiresUtc < DateTime.UtcNow
-            || string.IsNullOrWhiteSpace(stored.Username)
-            || string.IsNullOrWhiteSpace(stored.PasswordHash)
-            || string.IsNullOrWhiteSpace(stored.TotpSecret))
-        {
-            if (!string.IsNullOrWhiteSpace(data.SessionId))
+            var id = ReadId(context, name);
+            if (id == null || !_states.TryGetValue(id, out var state) || !ReferenceEquals(state, expected)
+                || state.ExpiresUtc <= DateTime.UtcNow)
             {
-                _setupStates.TryRemove(data.SessionId, out _);
+                return false;
             }
-
-            ClearSetupPending(httpContext);
-            return false;
-        }
-
-        state = stored;
-        return true;
-    }
-
-    /// <summary>清除初始化待会话（Cookie + 内存）</summary>
-    public void ClearSetupPending(HttpContext httpContext)
-    {
-        if (httpContext.Request.Cookies.TryGetValue(SetupCookieName, out var cookie)
-            && !string.IsNullOrEmpty(cookie)
-            && TryUnprotect(_setupProtector, cookie, out SetupPendingCookiePayload? data)
-            && data != null
-            && !string.IsNullOrWhiteSpace(data.SessionId))
-        {
-            _setupStates.TryRemove(data.SessionId, out _);
-        }
-
-        httpContext.Response.Cookies.Delete(SetupCookieName, BuildDeleteOptions());
-    }
-
-    /// <summary>
-    /// 重绑 TOTP：密码（及旧码）验证通过后写入待完成会话；
-    /// Cookie 仅含 SessionId，新密钥明文仅存内存。
-    /// </summary>
-    public void SetTotpRebindPending(HttpContext httpContext, TotpRebindPendingState state)
-    {
-        CleanupExpiredTotpRebindStates();
-        var sessionId = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
-        state.ExpiresUtc = DateTime.UtcNow.Add(TotpRebindPendingTimeToLive);
-        _totpRebindStates[sessionId] = state;
-
-        var cookiePayload = new SetupPendingCookiePayload { SessionId = sessionId };
-        WriteCookie(
-            httpContext,
-            TotpRebindCookieName,
-            Protect(_totpRebindProtector, cookiePayload, TotpRebindPendingTimeToLive),
-            TotpRebindPendingTimeToLive);
-    }
-
-    /// <summary>读取并校验重绑 TOTP 待会话</summary>
-    public bool TryGetTotpRebindPending(HttpContext httpContext, out TotpRebindPendingState state)
-    {
-        state = default!;
-        if (!httpContext.Request.Cookies.TryGetValue(TotpRebindCookieName, out var cookie)
-            || string.IsNullOrEmpty(cookie))
-        {
-            return false;
-        }
-
-        if (!TryUnprotect(_totpRebindProtector, cookie, out SetupPendingCookiePayload? data)
-            || data == null
-            || string.IsNullOrWhiteSpace(data.SessionId))
-        {
-            ClearTotpRebindPending(httpContext);
-            return false;
-        }
-
-        if (!_totpRebindStates.TryGetValue(data.SessionId, out var stored)
-            || stored.ExpiresUtc < DateTime.UtcNow
-            || stored.UserId == Guid.Empty
-            || string.IsNullOrWhiteSpace(stored.TotpSecret))
-        {
-            if (!string.IsNullOrWhiteSpace(data.SessionId))
+            if (++state.Attempts <= 5)
             {
-                _totpRebindStates.TryRemove(data.SessionId, out _);
+                return true;
             }
-
-            ClearTotpRebindPending(httpContext);
+            Clear(context, name);
             return false;
         }
-
-        state = stored;
-        return true;
     }
 
-    /// <summary>清除重绑 TOTP 待会话</summary>
-    public void ClearTotpRebindPending(HttpContext httpContext)
+    /// <summary>替换当前浏览器的授权，清理过期项并限制内存容量。</summary>
+    private void Set(HttpContext context, string name, PendingState state, TimeSpan ttl)
     {
-        if (httpContext.Request.Cookies.TryGetValue(TotpRebindCookieName, out var cookie)
-            && !string.IsNullOrEmpty(cookie)
-            && TryUnprotect(_totpRebindProtector, cookie, out SetupPendingCookiePayload? data)
-            && data != null
-            && !string.IsNullOrWhiteSpace(data.SessionId))
+        lock (_gate)
         {
-            _totpRebindStates.TryRemove(data.SessionId, out _);
+            Clear(context, name, deleteCookie: false);
+            foreach (var key in _states.Where(p => p.Value.ExpiresUtc <= DateTime.UtcNow).Select(p => p.Key).ToArray())
+            {
+                _states.Remove(key);
+            }
+            // 限制匿名初始化请求能够占用的内存；容量满时淘汰最早到期项。
+            if (_states.Count >= 1024)
+            {
+                _states.Remove(_states.MinBy(p => p.Value.ExpiresUtc).Key);
+            }
+            var id = Convert.ToHexString(RandomNumberGenerator.GetBytes(32));
+            state.ExpiresUtc = DateTime.UtcNow.Add(ttl);
+            _states.Add(id, state);
+            context.Response.Cookies.Append(name, _protection.CreateProtector(name + ".v2").Protect(id), new CookieOptions
+            {
+                HttpOnly = true, Secure = _secure || context.Request.IsHttps, SameSite = SameSiteMode.Lax,
+                IsEssential = true, MaxAge = ttl, Path = "/"
+            });
         }
-
-        httpContext.Response.Cookies.Delete(TotpRebindCookieName, BuildDeleteOptions());
     }
 
-    /// <summary>加密并附加过期时间</summary>
-    private static string Protect<T>(ITimeLimitedDataProtector protector, T payload, TimeSpan ttl)
+    /// <summary>在锁内读取类型及有效期均匹配的授权。</summary>
+    private bool Get<T>(HttpContext context, string name, out T state) where T : PendingState
     {
-        var json = JsonSerializer.Serialize(payload, JsonOptions);
-        var bytes = Encoding.UTF8.GetBytes(json);
-        return Convert.ToBase64String(protector.Protect(bytes, ttl));
+        lock (_gate)
+        {
+            state = null!;
+            var id = ReadId(context, name);
+            if (id != null && _states.TryGetValue(id, out var stored) && stored is T typed && stored.ExpiresUtc > DateTime.UtcNow)
+            {
+                state = typed;
+                return true;
+            }
+            Clear(context, name);
+            return false;
+        }
     }
 
-    /// <summary>解密；过期或篡改返回 false</summary>
-    private static bool TryUnprotect<T>(ITimeLimitedDataProtector protector, string cookie, out T? payload)
-        where T : class
+    /// <summary>仅消费读取时的同一状态实例，确保至多成功一次。</summary>
+    private bool Consume(HttpContext context, string name, PendingState expected)
     {
-        payload = null;
+        lock (_gate)
+        {
+            var id = ReadId(context, name);
+            if (id == null || !_states.TryGetValue(id, out var state) || !ReferenceEquals(state, expected)
+                || state.ExpiresUtc <= DateTime.UtcNow)
+            {
+                return false;
+            }
+            Clear(context, name);
+            return true;
+        }
+    }
+
+    /// <summary>在同一把锁内读取并消费，供不计尝试次数的一次性挑战使用。</summary>
+    private bool Take<T>(HttpContext context, string name, out T state) where T : PendingState
+    {
+        lock (_gate)
+        {
+            return Get(context, name, out state) && Consume(context, name, state);
+        }
+    }
+
+    /// <summary>同步撤销服务端状态，可按需删除浏览器 Cookie。</summary>
+    private void Clear(HttpContext context, string name, bool deleteCookie = true)
+    {
+        lock (_gate)
+        {
+            var id = ReadId(context, name);
+            if (id != null)
+            {
+                _states.Remove(id);
+            }
+            if (deleteCookie)
+            {
+                context.Response.Cookies.Delete(name, new CookieOptions { Path = "/", SameSite = SameSiteMode.Lax });
+            }
+        }
+    }
+
+    /// <summary>按流程独立的保护用途解密会话标识，篡改视为无效。</summary>
+    private string? ReadId(HttpContext context, string name)
+    {
+        if (!context.Request.Cookies.TryGetValue(name, out var value))
+        {
+            return null;
+        }
         try
         {
-            var bytes = protector.Unprotect(Convert.FromBase64String(cookie));
-            payload = JsonSerializer.Deserialize<T>(Encoding.UTF8.GetString(bytes), JsonOptions);
-            return payload != null;
+            return _protection.CreateProtector(name + ".v2").Unprotect(value);
         }
-        catch (Exception)
+        catch (CryptographicException)
         {
-            return false;
-        }
-    }
-
-    /// <summary>写入 HttpOnly Cookie</summary>
-    private void WriteCookie(HttpContext httpContext, string name, string value, TimeSpan ttl)
-    {
-        httpContext.Response.Cookies.Append(name, value, new CookieOptions
-        {
-            HttpOnly = true,
-            Secure = _secureAlways || httpContext.Request.IsHttps,
-            SameSite = SameSiteMode.Lax,
-            IsEssential = true,
-            MaxAge = ttl,
-            Path = "/"
-        });
-    }
-
-    /// <summary>删除 Cookie 时使用的选项（Path 需与写入一致）</summary>
-    private static CookieOptions BuildDeleteOptions() => new()
-    {
-        Path = "/",
-        SameSite = SameSiteMode.Lax
-    };
-
-    /// <summary>清理过期的初始化内存态</summary>
-    private void CleanupExpiredSetupStates()
-    {
-        var now = DateTime.UtcNow;
-        foreach (var pair in _setupStates)
-        {
-            if (pair.Value.ExpiresUtc < now)
-            {
-                _setupStates.TryRemove(pair.Key, out _);
-            }
-        }
-    }
-
-    /// <summary>清理过期的重绑 TOTP 内存态</summary>
-    private void CleanupExpiredTotpRebindStates()
-    {
-        var now = DateTime.UtcNow;
-        foreach (var pair in _totpRebindStates)
-        {
-            if (pair.Value.ExpiresUtc < now)
-            {
-                _totpRebindStates.TryRemove(pair.Key, out _);
-            }
+            return null;
         }
     }
 }
 
-/// <summary>登录第二步（TOTP）所需的短时载荷</summary>
-public sealed class LoginPendingPayload
+/// <summary>待验证流程共享的有效期和尝试次数。</summary>
+public abstract class PendingState
 {
-    /// <summary>已通过密码校验的用户 ID</summary>
+    public DateTime ExpiresUtc { get; set; }
+    public int Attempts { get; set; }
+}
+/// <summary>密码已通过验证的登录授权，不包含任何密码或 TOTP 密钥。</summary>
+public sealed class LoginPendingPayload : PendingState
+{
     public Guid UserId { get; set; }
-
-    /// <summary>用户名（仅展示）</summary>
     public string Username { get; set; } = string.Empty;
+    public long AuthVersion { get; set; }
 }
-
-/// <summary>初始化 / 重绑 Cookie 载荷：仅不透明会话 ID</summary>
-public sealed class SetupPendingCookiePayload
+/// <summary>初始化期间仅保留在内存中的账号凭据。</summary>
+public sealed class SetupPendingState : PendingState
 {
-    /// <summary>服务端内存会话键</summary>
-    public string SessionId { get; set; } = string.Empty;
-}
-
-/// <summary>初始化第二步内存态（不含明文密码）</summary>
-public sealed class SetupPendingState
-{
-    /// <summary>管理员用户名</summary>
     public string Username { get; set; } = string.Empty;
-
-    /// <summary>第一步已计算的密码哈希</summary>
     public string PasswordHash { get; set; } = string.Empty;
-
-    /// <summary>首个设备名称</summary>
     public string DeviceName { get; set; } = string.Empty;
-
-    /// <summary>服务端生成的 TOTP 明文密钥（仅存内存至完成/过期）</summary>
     public string TotpSecret { get; set; } = string.Empty;
-
-    /// <summary>过期时间（UTC）</summary>
-    public DateTime ExpiresUtc { get; set; }
+}
+/// <summary>绑定用户及认证版本的重绑授权。</summary>
+public sealed class TotpRebindPendingState : PendingState
+{
+    public Guid UserId { get; set; }
+    public long AuthVersion { get; set; }
+    public string TotpSecret { get; set; } = string.Empty;
 }
 
-/// <summary>重绑 TOTP 第二步内存态</summary>
-public sealed class TotpRebindPendingState
+/// <summary>匿名登录挑战的原始参数，仅保存在服务端。</summary>
+public sealed class PasskeyLoginState : PendingState
 {
-    /// <summary>当前管理员用户 ID</summary>
+    public string OptionsJson { get; set; } = string.Empty;
+}
+/// <summary>绑定挑战的原始参数及授权用户快照，仅保存在服务端。</summary>
+public sealed class PasskeyRegisterState : PendingState
+{
+    public string OptionsJson { get; set; } = string.Empty;
     public Guid UserId { get; set; }
-
-    /// <summary>新生成的 TOTP 明文密钥</summary>
-    public string TotpSecret { get; set; } = string.Empty;
-
-    /// <summary>过期时间（UTC）</summary>
-    public DateTime ExpiresUtc { get; set; }
+    public long AuthVersion { get; set; }
+    public string Name { get; set; } = string.Empty;
 }

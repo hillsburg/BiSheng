@@ -18,6 +18,8 @@ public class AccountModel : PageModel
     private readonly TotpSecretProtector _totpProtector;
     private readonly IWebHostEnvironment _env;
     private readonly ILogger<AccountModel> _logger;
+    private readonly AdminCredentialService _credentials;
+    private readonly AdminSessionService _sessions;
 
     /// <summary>构造账号页</summary>
     public AccountModel(
@@ -25,13 +27,15 @@ public class AccountModel : PageModel
         AdminPendingSessionService pendingSessions,
         TotpSecretProtector totpProtector,
         IWebHostEnvironment env,
-        ILogger<AccountModel> logger)
+        ILogger<AccountModel> logger, AdminCredentialService credentials, AdminSessionService sessions)
     {
         _db = db;
         _pendingSessions = pendingSessions;
         _totpProtector = totpProtector;
         _env = env;
         _logger = logger;
+        _credentials = credentials;
+        _sessions = sessions;
     }
 
     /// <summary>当前用户名</summary>
@@ -39,6 +43,9 @@ public class AccountModel : PageModel
 
     /// <summary>开发环境跳过旧 TOTP 校验</summary>
     public bool IsDevelopment => _env.IsDevelopment();
+    public bool NeedsTotp => !IsDevelopment && !AdminSessionService.HasRecentVerification(User);
+    [BindProperty]
+    public string PasswordChangeTotpCode { get; set; } = string.Empty;
 
     /// <summary>是否处于重绑 TOTP 扫码步骤</summary>
     public bool IsTotpRebindStep { get; set; }
@@ -111,10 +118,9 @@ public class AccountModel : PageModel
 
         RestoreTotpRebindStep();
 
-        if (!SetupModel.IsIdentityPasswordHash(user.PasswordHash)
-            || !SetupModel.VerifyPassword(CurrentPassword, user.PasswordHash))
+        if (!await _credentials.AuthorizeSensitiveOperationAsync(HttpContext, user, CurrentPassword, PasswordChangeTotpCode, IsDevelopment))
         {
-            ErrorMessage = "当前密码不正确";
+            ErrorMessage = "凭据错误、验证码已使用，或账户暂时锁定";
             return Page();
         }
 
@@ -130,17 +136,22 @@ public class AccountModel : PageModel
             return Page();
         }
 
-        if (SetupModel.VerifyPassword(NewPassword, user.PasswordHash))
+        if (PasswordCredentialService.VerifyPassword(NewPassword, user.PasswordHash))
         {
             ErrorMessage = "新密码不能与当前密码相同";
             return Page();
         }
 
-        user.PasswordHash = SetupModel.HashPassword(NewPassword);
-        await _db.SaveChangesAsync();
+        user.PasswordHash = PasswordCredentialService.HashPassword(NewPassword);
+        user.AuthVersion++;
+        if (!await SaveCredentialsAsync())
+        {
+            return Redirect("/admin/login");
+        }
+        await _sessions.SignOutAsync(HttpContext);
         _logger.LogInformation("管理员 {Username} 已修改密码", user.Username);
         TempData["AccountSuccess"] = "密码已更新";
-        return Redirect("/admin/account");
+        return Redirect("/admin/login");
     }
 
     /// <summary>开始重绑：校验当前凭据后生成新密钥</summary>
@@ -152,27 +163,17 @@ public class AccountModel : PageModel
             return Redirect("/admin/login");
         }
 
-        if (!SetupModel.IsIdentityPasswordHash(user.PasswordHash)
-            || !SetupModel.VerifyPassword(TotpCurrentPassword, user.PasswordHash))
+        if (!await _credentials.AuthorizeSensitiveOperationAsync(HttpContext, user, TotpCurrentPassword, CurrentTotpCode, IsDevelopment))
         {
-            ErrorMessage = "当前密码不正确";
+            ErrorMessage = "凭据错误、验证码已使用，或账户暂时锁定";
             return Page();
-        }
-
-        if (!IsDevelopment)
-        {
-            var plain = _totpProtector.Unprotect(user.TotpSecret);
-            if (!TotpHelper.VerifyCode(plain, CurrentTotpCode))
-            {
-                ErrorMessage = "当前验证码错误，请检查 Authenticator App";
-                return Page();
-            }
         }
 
         var newSecret = TotpHelper.GenerateSecret();
         _pendingSessions.SetTotpRebindPending(HttpContext, new TotpRebindPendingState
         {
             UserId = user.Id,
+            AuthVersion = user.AuthVersion,
             TotpSecret = newSecret
         });
 
@@ -193,7 +194,7 @@ public class AccountModel : PageModel
         }
 
         if (!_pendingSessions.TryGetTotpRebindPending(HttpContext, out var pending)
-            || pending.UserId != user.Id)
+            || pending.UserId != user.Id || pending.AuthVersion != user.AuthVersion)
         {
             ErrorMessage = "重绑会话已过期，请重新开始";
             _pendingSessions.ClearTotpRebindPending(HttpContext);
@@ -205,18 +206,63 @@ public class AccountModel : PageModel
             TotpHelper.GetOtpAuthUri(pending.TotpSecret, user.Username));
         IsTotpRebindStep = true;
 
-        if (!TotpHelper.VerifyCode(pending.TotpSecret, NewTotpCode))
+        if (!_pendingSessions.BeginAttempt(HttpContext, AdminPendingSessionService.TotpRebindCookieName, pending)
+            || !TotpHelper.TryVerifyCode(pending.TotpSecret, NewTotpCode, out var timeStep))
         {
             ErrorMessage = "新验证码错误，请用新二维码对应的 App 重试";
             return Page();
         }
 
+        if (!_pendingSessions.ConsumeTotpRebindPending(HttpContext, pending))
+        {
+            return Redirect("/admin/account");
+        }
         user.TotpSecret = _totpProtector.Protect(pending.TotpSecret);
-        await _db.SaveChangesAsync();
+        user.LastTotpTimeStep = timeStep;
+        user.AuthVersion++;
+        if (!await SaveCredentialsAsync())
+        {
+            return Redirect("/admin/login");
+        }
+        await _sessions.SignOutAsync(HttpContext);
         _pendingSessions.ClearTotpRebindPending(HttpContext);
         _logger.LogInformation("管理员 {Username} 已重绑 TOTP", user.Username);
         TempData["AccountSuccess"] = "两步验证已重新绑定，请确认旧条目已从 Authenticator 中删除";
-        return Redirect("/admin/account");
+        return Redirect("/admin/login");
+    }
+
+    /// <summary>重新验证后提高认证版本，撤销当前账号的全部后台会话。</summary>
+    public async Task<IActionResult> OnPostRevokeSessionsAsync()
+    {
+        var user = await LoadUserAsync();
+        if (user == null)
+        {
+            return Redirect("/admin/login");
+        }
+        if (!await _credentials.AuthorizeSensitiveOperationAsync(HttpContext, user, CurrentPassword, PasswordChangeTotpCode, IsDevelopment))
+        {
+            ErrorMessage = "凭据错误、验证码已使用，或账户暂时锁定";
+            return Page();
+        }
+        user.AuthVersion++;
+        await SaveCredentialsAsync();
+        await _sessions.SignOutAsync(HttpContext);
+        return Redirect("/admin/login");
+    }
+
+    /// <summary>保存凭据变更；并发更新冲突时退出当前会话，防止覆盖新凭据。</summary>
+    private async Task<bool> SaveCredentialsAsync()
+    {
+        try
+        {
+            await _db.SaveChangesAsync();
+            return true;
+        }
+        catch (DbUpdateConcurrencyException)
+        {
+            await _sessions.SignOutAsync(HttpContext);
+            return false;
+        }
     }
 
     private async Task<Data.Entities.User?> LoadUserAsync()

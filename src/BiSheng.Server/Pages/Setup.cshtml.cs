@@ -1,9 +1,8 @@
-﻿using System.Security.Cryptography;
+using System.Security.Cryptography;
 using BiSheng.Server.Auth;
 using BiSheng.Server.Data;
 using BiSheng.Server.Data.Entities;
 using BiSheng.Server.Services;
-using Microsoft.AspNetCore.Identity;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.EntityFrameworkCore;
@@ -86,6 +85,11 @@ public class SetupModel : PageModel
     /// <summary>POST：第一步生成密钥会话，或第二步完成初始化</summary>
     public async Task<IActionResult> OnPostAsync()
     {
+        if (await _db.ServerConfigs.AnyAsync(c => c.Id == 1 && c.IsSetup))
+        {
+            return Redirect("/admin/login");
+        }
+
         // ===== 第二步：仅信任服务端 pending Cookie 中的密钥与凭据 =====
         if (_pendingSessions.TryGetSetupPending(HttpContext, out var pending))
         {
@@ -115,7 +119,7 @@ public class SetupModel : PageModel
         _pendingSessions.SetSetupPending(HttpContext, new SetupPendingState
         {
             Username = Username.Trim(),
-            PasswordHash = HashPassword(Password),
+            PasswordHash = PasswordCredentialService.HashPassword(Password),
             DeviceName = DeviceName?.Trim() ?? string.Empty,
             TotpSecret = totpSecret
         });
@@ -138,10 +142,16 @@ public class SetupModel : PageModel
         QrCodeUrl = TotpHelper.GetQrCodeDataUri(
             TotpHelper.GetOtpAuthUri(pending.TotpSecret, pending.Username));
 
-        if (!TotpHelper.VerifyCode(pending.TotpSecret, TotpCode))
+        if (!_pendingSessions.BeginAttempt(HttpContext, AdminPendingSessionService.SetupCookieName, pending)
+            || !TotpHelper.VerifyCode(pending.TotpSecret, TotpCode))
         {
             ErrorMessage = "验证码错误，请检查 Authenticator App 后重试";
             return Page();
+        }
+
+        if (!_pendingSessions.ConsumeSetupPending(HttpContext, pending))
+        {
+            return Redirect("/admin/setup");
         }
 
         // 创建管理员（密码已在第一步哈希；TOTP 密钥加密落库）
@@ -198,62 +208,4 @@ public class SetupModel : PageModel
         return Convert.ToHexString(bytes).ToLowerInvariant();
     }
 
-    /// <summary>
-    /// 使用 PBKDF2（ASP.NET Identity 内置 PasswordHasher）哈希密码
-    /// </summary>
-    internal static string HashPassword(string password)
-    {
-        return PasswordHasher.HashPassword(null!, password);
-    }
-
-    /// <summary>
-    /// 存储哈希是否为当前 Identity PasswordHasher 可解析的 Base64 格式。
-    /// 旧库或手工种子数据可能不是此格式，直接 Verify 会抛 FormatException。
-    /// </summary>
-    internal static bool IsIdentityPasswordHash(string? storedHash)
-    {
-        if (string.IsNullOrWhiteSpace(storedHash))
-        {
-            return false;
-        }
-
-        try
-        {
-            _ = Convert.FromBase64String(storedHash);
-            return true;
-        }
-        catch (FormatException)
-        {
-            return false;
-        }
-    }
-
-    /// <summary>
-    /// 验证密码（PBKDF2）。哈希为空、格式非法或校验失败时返回 false，不向外抛异常。
-    /// </summary>
-    internal static bool VerifyPassword(string password, string? storedHash)
-    {
-        if (string.IsNullOrEmpty(password) || !IsIdentityPasswordHash(storedHash))
-        {
-            return false;
-        }
-
-        try
-        {
-            var result = PasswordHasher.VerifyHashedPassword(null!, storedHash!, password);
-            return result == PasswordVerificationResult.Success
-                || result == PasswordVerificationResult.SuccessRehashNeeded;
-        }
-        catch (FormatException)
-        {
-            // 双重保险：极端情况下 Identity 仍可能抛格式异常
-            return false;
-        }
-        catch (ArgumentException)
-        {
-            return false;
-        }
-    }
-
-    private static readonly PasswordHasher<object> PasswordHasher = new();
 }
