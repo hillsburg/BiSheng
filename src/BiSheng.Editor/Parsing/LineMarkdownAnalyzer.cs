@@ -112,51 +112,125 @@ namespace BiSheng.Editor.Parsing
             }
 
             // 加粗
-            foreach (Match match in BoldRegex.Matches(line))
+            AddNestable(markers, BoldRegex, line, match =>
             {
-                if (IsInsideExisting(markers, match.Index)) continue;
                 int delimLen = match.Groups[1].Length;
-                markers.Add(new InlineMarker
+                return new InlineMarker
                 {
                     SyntaxStartIndex = match.Index,
                     StartIndex = match.Index + delimLen,
                     EndIndex = match.Index + match.Length - delimLen - 1,
                     SyntaxEndIndex = match.Index + match.Length - 1,
                     Style = InlineStyle.Bold
-                });
-            }
+                };
+            });
 
-            // 斜体（在加粗之后）
-            foreach (Match match in ItalicRegex.Matches(line))
+            // 斜体（在加粗之后：加粗的 ** 会先被正则当成空斜体匹配到，由重叠规则拒掉）
+            AddNestable(markers, ItalicRegex, line, match => new InlineMarker
             {
-                if (IsInsideExisting(markers, match.Index)) continue;
-                markers.Add(new InlineMarker
-                {
-                    SyntaxStartIndex = match.Index,
-                    StartIndex = match.Index + 1,
-                    EndIndex = match.Index + match.Length - 2,
-                    SyntaxEndIndex = match.Index + match.Length - 1,
-                    Style = InlineStyle.Italic
-                });
-            }
+                SyntaxStartIndex = match.Index,
+                StartIndex = match.Index + 1,
+                EndIndex = match.Index + match.Length - 2,
+                SyntaxEndIndex = match.Index + match.Length - 1,
+                Style = InlineStyle.Italic
+            });
 
             // 链接
-            foreach (Match match in LinkRegex.Matches(line))
+            AddNestable(markers, LinkRegex, line, match => new InlineMarker
             {
-                if (IsInsideExisting(markers, match.Index)) continue;
-                markers.Add(new InlineMarker
-                {
-                    SyntaxStartIndex = match.Index,
-                    StartIndex = match.Index + 1,
-                    EndIndex = match.Index + match.Groups[1].Length,
-                    SyntaxEndIndex = match.Index + match.Length - 1,
-                    Style = InlineStyle.Link
-                });
-            }
+                SyntaxStartIndex = match.Index,
+                StartIndex = match.Index + 1,
+                EndIndex = match.Index + match.Groups[1].Length,
+                SyntaxEndIndex = match.Index + match.Length - 1,
+                Style = InlineStyle.Link
+            });
 
             return markers;
         }
 
+        /// <summary>
+        /// 逐个匹配并加入可嵌套的行内标记（粗体、斜体、链接）。
+        /// 某个匹配被拒后从下一个字符重新匹配，而不是跳过整段：
+        /// 否则 "**粗 *斜* 粗**" 中开头的 ** 被当作空斜体吞掉后，真正的 *斜* 就再也匹配不到。
+        /// </summary>
+        private static void AddNestable(
+            List<InlineMarker> markers,
+            Regex regex,
+            string line,
+            Func<Match, InlineMarker> build)
+        {
+            int position = 0;
+            while (position < line.Length)
+            {
+                var match = regex.Match(line, position);
+                if (!match.Success)
+                {
+                    break;
+                }
+
+                var candidate = build(match);
+                if (!IsIntrawordUnderscore(line, candidate) && CanPlace(markers, candidate))
+                {
+                    markers.Add(candidate);
+                    position = match.Index + match.Length;
+                }
+                else
+                {
+                    position = match.Index + 1;
+                }
+            }
+        }
+
+        /// <summary>
+        /// 新标记能否放入：行内代码与图片内部按字面量处理，任何重叠都拒绝；
+        /// 其余标记允许完全嵌套（一方整体落在另一方的内容区内），但不允许交叉或压住对方的语法符号
+        /// </summary>
+        private static bool CanPlace(List<InlineMarker> markers, InlineMarker candidate)
+        {
+            foreach (var existing in markers)
+            {
+                bool disjoint = candidate.SyntaxEndIndex < existing.SyntaxStartIndex
+                                || candidate.SyntaxStartIndex > existing.SyntaxEndIndex;
+                if (disjoint)
+                {
+                    continue;
+                }
+
+                if (existing.Style is InlineStyle.InlineCode or InlineStyle.Image)
+                {
+                    return false;
+                }
+
+                bool candidateInsideExisting = candidate.SyntaxStartIndex >= existing.StartIndex
+                                               && candidate.SyntaxEndIndex <= existing.EndIndex;
+                bool existingInsideCandidate = existing.SyntaxStartIndex >= candidate.StartIndex
+                                               && existing.SyntaxEndIndex <= candidate.EndIndex;
+                if (!candidateInsideExisting && !existingInsideCandidate)
+                {
+                    return false;
+                }
+            }
+
+            return true;
+        }
+
+        /// <summary>
+        /// 下划线强调不能出现在单词中间（CommonMark 规则）：snake_case_name、my_file_v2.md 不应变成斜体
+        /// </summary>
+        private static bool IsIntrawordUnderscore(string line, InlineMarker candidate)
+        {
+            if (line[candidate.SyntaxStartIndex] != '_')
+            {
+                return false;
+            }
+
+            int before = candidate.SyntaxStartIndex - 1;
+            int after = candidate.SyntaxEndIndex + 1;
+            return (before >= 0 && char.IsLetterOrDigit(line[before]))
+                   || (after < line.Length && char.IsLetterOrDigit(line[after]));
+        }
+
+        /// <summary>图片只需避开行内代码（代码里的 ![..](..) 是字面量）</summary>
         private static bool IsInsideExisting(List<InlineMarker> markers, int index)
         {
             return markers.Any(m => index >= m.SyntaxStartIndex && index <= m.SyntaxEndIndex);
