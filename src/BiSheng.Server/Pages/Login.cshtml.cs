@@ -1,10 +1,5 @@
-using System.Security.Claims;
 using BiSheng.Server.Auth;
 using BiSheng.Server.Data;
-using BiSheng.Server.Services;
-using Microsoft.AspNetCore.Authentication;
-using Microsoft.AspNetCore.Authentication.Cookies;
-using Microsoft.AspNetCore.Hosting;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 using Microsoft.AspNetCore.RateLimiting;
@@ -20,6 +15,8 @@ public class LoginModel : PageModel
     private readonly AdminPendingSessionService _pendingSessions;
     private readonly TotpSecretProtector _totpProtector;
     private readonly ILogger<LoginModel> _logger;
+    private readonly AdminCredentialService _credentials;
+    private readonly AdminSessionService _sessions;
 
     /// <summary>构造登录页模型</summary>
     public LoginModel(
@@ -27,13 +24,15 @@ public class LoginModel : PageModel
         IWebHostEnvironment env,
         AdminPendingSessionService pendingSessions,
         TotpSecretProtector totpProtector,
-        ILogger<LoginModel> logger)
+        ILogger<LoginModel> logger, AdminCredentialService credentials, AdminSessionService sessions)
     {
         _db = db;
         _env = env;
         _pendingSessions = pendingSessions;
         _totpProtector = totpProtector;
         _logger = logger;
+        _credentials = credentials;
+        _sessions = sessions;
     }
 
     /// <summary>
@@ -125,44 +124,21 @@ public class LoginModel : PageModel
 
         // ===== 第一步：校验用户名 + 密码 =====
         var user = await _db.Users.FirstOrDefaultAsync(u => u.Username == Username);
-        if (user == null)
+        if (!await _credentials.VerifyPasswordAsync(user, Password))
         {
-            _logger.LogWarning(
-                "管理后台登录失败: 用户名={Username}, IP={RemoteIp}",
-                Username, HttpContext.Connection.RemoteIpAddress);
-            ErrorMessage = "用户名或密码错误";
-            return Page();
-        }
-
-        // 旧库密码哈希可能不是 Identity Base64 格式，避免 Verify 抛 500
-        if (!SetupModel.IsIdentityPasswordHash(user.PasswordHash))
-        {
-            _logger.LogError(
-                "管理后台登录中止: 用户 {Username} 的 PasswordHash 无法被当前版本解析（可能来自旧数据库）",
-                user.Username);
-            ErrorMessage =
-                "该账户的密码存储格式与当前版本不兼容（常见于沿用旧版数据库）。"
-                + "请删除服务端数据库后重新完成初始化向导，或重置管理员密码后再登录。";
-            return Page();
-        }
-
-        if (!SetupModel.VerifyPassword(Password, user.PasswordHash))
-        {
-            _logger.LogWarning(
-                "管理后台登录失败: 用户名={Username}, IP={RemoteIp}",
-                Username, HttpContext.Connection.RemoteIpAddress);
-            ErrorMessage = "用户名或密码错误";
+            _logger.LogWarning("后台登录失败，IP={RemoteIp}", HttpContext.Connection.RemoteIpAddress);
+            ErrorMessage = "用户名或密码错误，或账户暂时锁定";
             return Page();
         }
 
         // 开发调试环境：跳过 TOTP，直接登录
         if (_env.IsDevelopment())
         {
-            return await SignInUser(user);
+            return await SignInUser(user!);
         }
 
         // 生产 / Test：密码验证通过，写入短时会话后进入 TOTP 步骤
-        var plainTotp = _totpProtector.Unprotect(user.TotpSecret);
+        var plainTotp = _totpProtector.Unprotect(user!.TotpSecret);
         if (string.IsNullOrWhiteSpace(plainTotp))
         {
             _logger.LogError(
@@ -172,14 +148,7 @@ public class LoginModel : PageModel
             return Page();
         }
 
-        // 明文存量：登录前升级为密文
-        if (!TotpSecretProtector.IsProtected(user.TotpSecret))
-        {
-            user.TotpSecret = _totpProtector.Protect(plainTotp);
-            await _db.SaveChangesAsync();
-        }
-
-        _pendingSessions.SetLoginPending(HttpContext, user.Id, user.Username);
+        _pendingSessions.SetLoginPending(HttpContext, user.Id, user.Username, user.AuthVersion);
         PendingUsername = user.Username;
         IsTotpStep = true;
         return Page();
@@ -194,7 +163,7 @@ public class LoginModel : PageModel
         IsTotpStep = true;
 
         var user = await _db.Users.FindAsync(pending.UserId);
-        if (user == null)
+        if (user == null || user.AuthVersion != pending.AuthVersion)
         {
             ErrorMessage = "用户不存在，请重新登录";
             _pendingSessions.ClearLoginPending(HttpContext);
@@ -202,8 +171,8 @@ public class LoginModel : PageModel
             return Page();
         }
 
-        var plainTotp = _totpProtector.Unprotect(user.TotpSecret);
-        if (!TotpHelper.VerifyCode(plainTotp, TotpCode))
+        if (!_pendingSessions.BeginAttempt(HttpContext, AdminPendingSessionService.LoginCookieName, pending)
+            || !await _credentials.VerifyTotpAsync(user, TotpCode))
         {
             _logger.LogWarning(
                 "管理后台 TOTP 验证失败: 用户名={Username}, IP={RemoteIp}",
@@ -212,14 +181,9 @@ public class LoginModel : PageModel
             return Page();
         }
 
-        if (!TotpSecretProtector.IsProtected(user.TotpSecret) && !string.IsNullOrWhiteSpace(plainTotp))
-        {
-            user.TotpSecret = _totpProtector.Protect(plainTotp);
-            await _db.SaveChangesAsync();
-        }
-
-        _pendingSessions.ClearLoginPending(HttpContext);
-        return await SignInUser(user);
+        if (!_pendingSessions.ConsumeLoginPending(HttpContext, pending))
+            return Redirect("/admin/login");
+        return await SignInUser(user!);
     }
 
     /// <summary>
@@ -227,16 +191,8 @@ public class LoginModel : PageModel
     /// </summary>
     private async Task<IActionResult> SignInUser(Data.Entities.User user)
     {
-        var claims = new[]
-        {
-            new Claim(ClaimTypes.NameIdentifier, user.Id.ToString()),
-            new Claim(ClaimTypes.Name, user.Username),
-            new Claim(ClaimTypes.Role, AuthRoles.Admin),
-        };
-        var identity = new ClaimsIdentity(claims, CookieAuthenticationDefaults.AuthenticationScheme);
-        var principal = new ClaimsPrincipal(identity);
-
-        await HttpContext.SignInAsync(CookieAuthenticationDefaults.AuthenticationScheme, principal);
+        await _credentials.ResetFailuresAsync(user.Id);
+        await _sessions.SignInAsync(HttpContext, user);
 
         // 首装 Key：Keep TempData 并带到 Keys 页一次性展示
         if (TempData.Peek("NewApiKey") is string)

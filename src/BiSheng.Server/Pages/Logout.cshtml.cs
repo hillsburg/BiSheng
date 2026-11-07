@@ -1,15 +1,16 @@
-﻿using Microsoft.AspNetCore.Authentication;
-using Microsoft.AspNetCore.Authentication.Cookies;
+﻿using BiSheng.Server.Auth;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.AspNetCore.Mvc.RazorPages;
 
 namespace BiSheng.Server.Pages;
 
-public class LogoutModel : PageModel
+public class LogoutModel(AdminSessionService sessions, AdminPendingSessionService pending) : PageModel
 {
     public async Task<IActionResult> OnGetAsync()
     {
-        await HttpContext.SignOutAsync(CookieAuthenticationDefaults.AuthenticationScheme);
+        pending.ClearLoginPending(HttpContext);
+        pending.ClearTotpRebindPending(HttpContext);
+        await sessions.SignOutAsync(HttpContext);
         return Redirect("/admin/login");
     }
 }

@@ -59,8 +59,9 @@ builder.Services.AddRateLimiter(options =>
     {
         if (!HttpMethods.IsPost(context.Request.Method))
         {
+            // 只读请求使用独立分区，避免与同 IP 的 POST 复用错误类型的限流器。
             return RateLimitPartition.GetNoLimiter(
-                context.Connection.RemoteIpAddress?.ToString() ?? "unknown");
+                "safe:" + (context.Connection.RemoteIpAddress?.ToString() ?? "unknown"));
         }
 
         var ip = context.Connection.RemoteIpAddress?.ToString() ?? "unknown";
@@ -149,6 +150,8 @@ if (app.Environment.IsDevelopment())
     app.UseSwaggerUI();
 }
 
+// 提供通行密钥页面脚本；否则表单会退回浏览器默认提交行为。
+app.UseStaticFiles();
 app.UseRateLimiter();
 app.UseCors();
 app.UseMiddleware<SetupMiddleware>();

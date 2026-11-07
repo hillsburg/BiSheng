@@ -32,8 +32,13 @@ public static class TotpHelper
     /// 空密钥视为未绑定，直接失败（不抛 Base32 异常）。
     /// </summary>
     public static bool VerifyCode(string secret, string code)
+        => TryVerifyCode(secret, code, out _);
+
+    /// <summary>验证 TOTP 并返回匹配时间步，供数据库防重放检查使用。</summary>
+    public static bool TryVerifyCode(string secret, string code, out long timeStep)
     {
-        if (string.IsNullOrWhiteSpace(secret) || string.IsNullOrWhiteSpace(code) || code.Length != 6)
+        timeStep = 0;
+        if (string.IsNullOrWhiteSpace(secret) || string.IsNullOrWhiteSpace(code) || (code.Length != 6 || code.Any(c => c < '0' || c > '9')))
         {
             return false;
         }
@@ -42,7 +47,7 @@ public static class TotpHelper
         {
             var secretBytes = Base32Encoding.ToBytes(secret);
             var totp = new Totp(secretBytes);
-            return totp.VerifyTotp(code, out _, new VerificationWindow(previous: 1, future: 1));
+            return totp.VerifyTotp(code, out timeStep, new VerificationWindow(previous: 1, future: 1));
         }
         catch (Exception)
         {

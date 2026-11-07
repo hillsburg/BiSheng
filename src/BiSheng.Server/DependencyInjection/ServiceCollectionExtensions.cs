@@ -5,10 +5,12 @@ using BiSheng.Server.Services;
 using BiSheng.Server.Services.Images;
 using BiSheng.Server.Services.Mutations;
 using BiSheng.Shared.Api;
+using Fido2NetLib;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.DataProtection;
 using Microsoft.AspNetCore.Mvc;
 using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.Options;
 
 namespace BiSheng.Server.DependencyInjection;
 
@@ -63,6 +65,8 @@ public static class ServiceCollectionExtensions
                 options.Cookie.SameSite = SameSiteMode.Lax;
                 options.ExpireTimeSpan = TimeSpan.FromDays(7);
                 options.SlidingExpiration = true;
+                options.Events.OnValidatePrincipal = context => context.HttpContext.RequestServices
+                    .GetRequiredService<AdminSessionService>().ValidateAsync(context);
             })
             .AddScheme<Microsoft.AspNetCore.Authentication.AuthenticationSchemeOptions, ApiKeyAuthHandler>(
                 ApiKeyAuthHandler.SchemeName, _ => { });
@@ -71,6 +75,24 @@ public static class ServiceCollectionExtensions
         // 管理后台两步登录 / 初始化的短时加密会话
         services.AddSingleton<AdminPendingSessionService>();
         services.AddSingleton<TotpSecretProtector>();
+        services.AddScoped<AdminSessionService>();
+        services.AddOptions<WebAuthnOptions>().Bind(configuration.GetSection("WebAuthn"))
+            .Validate(o => o.IsValid(), "WebAuthn 配置无效：请配置 RP 域名、站点名称及精确的 HTTPS Origins。")
+            .ValidateOnStart();
+        // 信任边界只取自部署配置，不从请求 Host 推导。
+        services.AddSingleton<IFido2>(provider =>
+        {
+            var options = provider.GetRequiredService<IOptions<WebAuthnOptions>>().Value;
+            return new Fido2(new Fido2Configuration
+            {
+                ServerDomain = options.RpId,
+                ServerName = options.RpName,
+                Origins = options.Origins.ToHashSet(StringComparer.Ordinal),
+                Timeout = (uint)WebAuthnOptions.CeremonyTimeout.TotalMilliseconds
+            });
+        });
+        services.AddScoped<PasskeyService>();
+        services.AddScoped<AdminCredentialService>();
         services.Configure<ServerUpdateOptions>(
             configuration.GetSection(ServerUpdateOptions.SectionName));
         services.Configure<CompatibilityOptions>(

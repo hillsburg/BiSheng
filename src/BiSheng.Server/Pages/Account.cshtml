@@ -1,5 +1,6 @@
 @page "/admin/account"
 @model AccountModel
+@inject Microsoft.Extensions.Options.IOptions<BiSheng.Server.Auth.WebAuthnOptions> WebAuthn
 @{
     ViewData["Title"] = "账号安全";
 }
@@ -113,7 +114,7 @@
 
 <div class="section-card">
     <h2 class="section-title">修改密码</h2>
-    <p class="section-desc">修改后下次登录使用新密码。不影响已签发的 API Key。</p>
+    <p class="section-desc">修改后所有后台会话失效，请重新登录。不影响已签发的 API Key。</p>
     <form method="post" asp-page-handler="ChangePassword">
         <div class="form-group">
             <label>当前密码</label>
@@ -127,6 +128,13 @@
             <label>确认新密码</label>
             <input asp-for="ConfirmNewPassword" type="password" required minlength="6" autocomplete="new-password" />
         </div>
+        @if (Model.NeedsTotp)
+        {
+            <div class="form-group">
+                <label>当前验证码</label>
+                <input asp-for="PasswordChangeTotpCode" required maxlength="6" pattern="[0-9]{6}" autocomplete="one-time-code" />
+            </div>
+        }
         <button type="submit" class="btn btn-primary">更新密码</button>
     </form>
 </div>
@@ -135,7 +143,7 @@
     <h2 class="section-title">重绑两步验证（TOTP）</h2>
     <p class="section-desc">
         丢失 Authenticator 或更换手机时使用。完成后请删除 App 中的旧条目。
-        @(Model.IsDevelopment ? "开发环境无需输入当前验证码。" : "需验证当前密码与当前验证码。")
+        @(Model.IsDevelopment ? "开发环境无需输入当前验证码。" : "需验证当前密码；最近 5 分钟未完成验证时还需当前验证码。")
     </p>
 
     @if (Model.IsTotpRebindStep)
@@ -169,7 +177,7 @@
                 <label>当前密码</label>
                 <input asp-for="TotpCurrentPassword" type="password" required autocomplete="current-password" />
             </div>
-            @if (!Model.IsDevelopment)
+            @if (Model.NeedsTotp)
             {
                 <div class="form-group">
                     <label>当前验证码</label>
@@ -182,3 +190,57 @@
         </form>
     }
 </div>
+
+<div class="section-card">
+    <h2 class="section-title">退出所有设备</h2>
+    <p class="section-desc">撤销全部后台登录及待完成授权，包含当前设备。API Key 不受影响。</p>
+    <form method="post" asp-page-handler="RevokeSessions">
+        <div class="form-group">
+            <label>当前密码</label>
+            <input asp-for="CurrentPassword" type="password" required autocomplete="current-password" id="RevokePassword" />
+        </div>
+        @if (Model.NeedsTotp)
+        {
+            <div class="form-group">
+                <label>当前验证码</label>
+                <input asp-for="PasswordChangeTotpCode" required maxlength="6" pattern="[0-9]{6}" autocomplete="one-time-code" id="RevokeTotp" />
+            </div>
+        }
+        <button type="submit" class="btn btn-primary">退出所有设备</button>
+    </form>
+</div>
+
+@if (WebAuthn.Value.Enabled)
+{
+    <div class="section-card" id="passkey-management"
+         data-development="@Model.IsDevelopment.ToString().ToLowerInvariant()"
+         data-verified-at="@(User.FindFirst(BiSheng.Server.Auth.AdminSessionService.VerifiedAtClaim)?.Value)"
+         data-verification-window="@((int)BiSheng.Server.Auth.AdminSessionService.RecentVerificationWindow.TotalSeconds)">
+        <h2 class="section-title">通行密钥</h2>
+        <p class="section-desc">使用设备解锁直接登录。建议绑定多把通行密钥，密码与两步验证仍可备用登录。</p>
+        <p class="section-desc">添加或删除前，请填写当前密码及需要的验证码。</p>
+        <form id="passkey-form" method="post">
+            @Html.AntiForgeryToken()
+            <div class="form-group">
+                <label for="passkey-name">通行密钥名称</label>
+                <input id="passkey-name" maxlength="64" required placeholder="例如：我的电脑" />
+            </div>
+            <div class="form-group">
+                <label for="passkey-password">当前密码</label>
+                <input id="passkey-password" type="password" autocomplete="current-password" required />
+            </div>
+            <div class="form-group" id="passkey-totp-group" hidden="@(!Model.NeedsTotp)">
+                <label for="passkey-totp">当前验证码</label>
+                <input id="passkey-totp" maxlength="6" pattern="[0-9]{6}" autocomplete="one-time-code" inputmode="numeric" />
+            </div>
+            <button type="submit" class="btn btn-primary" id="passkey-add" disabled>在此设备上添加</button>
+            <button type="submit" class="btn btn-secondary" id="passkey-add-other" disabled>使用其他设备添加</button>
+            <p class="section-desc">此设备：Windows Hello、Touch ID 等；其他设备：手机或 USB 安全密钥。具体弹窗由浏览器和系统提供。</p>
+        </form>
+        <p id="passkey-message" role="status" aria-live="polite">正在加载通行密钥功能…</p>
+        <noscript><p class="alert alert-danger">请启用 JavaScript 后刷新页面，再添加通行密钥。</p></noscript>
+        <div id="passkey-list"></div>
+    </div>
+    <script src="~/js/passkey-common.js" asp-append-version="true" defer></script>
+    <script src="~/js/passkey-manage.js" asp-append-version="true" defer></script>
+}
