@@ -90,7 +90,7 @@ namespace BiSheng.Editor.Rendering
                     return LineMarkdownAnalyzer.GetHeadingPrefixLength(text);
 
                 case LineType.BlockQuote:
-                    return text.StartsWith("> ") ? 2 : (text.StartsWith(">") ? 1 : 0);
+                    return LineMarkdownAnalyzer.GetBlockQuotePrefixLength(text);
 
                 case LineType.CodeBlock:
                     return lineLength; // 折叠整个 ```language 行

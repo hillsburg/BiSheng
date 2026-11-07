@@ -20,16 +20,18 @@ namespace BiSheng.Editor.Parsing
         private static readonly Regex CodeBlockFenceRegex = new(@"^```", RegexOptions.Compiled);
         // 水平分割线: --- 或 ***
         private static readonly Regex HorizontalRuleRegex = new(@"^(-{3,}|\*{3,}|_{3,})\s*$", RegexOptions.Compiled);
-        // 图片: ![alt](url)
-        private static readonly Regex ImageRegex = new(@"!\[([^\]]*)\]\(([^)]+)\)", RegexOptions.Compiled);
+        // 图片: ![alt](url)，url 允许一层成对括号（同链接）
+        private static readonly Regex ImageRegex = new(@"!\[([^\]]*)\]\(((?:[^()]|\([^()]*\))+)\)", RegexOptions.Compiled);
         // 行内代码: `code`
         private static readonly Regex InlineCodeRegex = new(@"`([^`]+)`", RegexOptions.Compiled);
+        // 粗斜体: ***text*** 或 ___text___（须先于加粗识别，否则 ** 会吃掉三连符号中的两个）
+        private static readonly Regex BoldItalicRegex = new(@"(\*{3}|_{3})(?!\s)(.+?)(?<!\s)\1", RegexOptions.Compiled);
         // 加粗: **text** 或 __text__
         private static readonly Regex BoldRegex = new(@"(\*\*|__)(.*?)\1", RegexOptions.Compiled);
         // 斜体: *text* 或 _text_
         private static readonly Regex ItalicRegex = new(@"(?<![*\\])(\*|_)(?!\s)(.*?)(?<!\s)\1(?!\*)", RegexOptions.Compiled);
-        // 链接: [text](url)
-        private static readonly Regex LinkRegex = new(@"\[([^\]]+)\]\(([^)]+)\)", RegexOptions.Compiled);
+        // 链接: [text](url)，url 允许一层成对括号，如 https://en.wikipedia.org/wiki/C_(language)
+        private static readonly Regex LinkRegex = new(@"\[([^\]]+)\]\(((?:[^()]|\([^()]*\))+)\)", RegexOptions.Compiled);
 
         /// <summary>
         /// 分析单行文本的类型
@@ -111,6 +113,24 @@ namespace BiSheng.Editor.Parsing
                 });
             }
 
+            // 粗斜体：拆成外层斜体（单个符号）+ 内层粗体（两个符号），渲染时两种字形属性叠加
+            AddNestable(markers, BoldItalicRegex, line, match => new InlineMarker
+            {
+                SyntaxStartIndex = match.Index,
+                StartIndex = match.Index + 1,
+                EndIndex = match.Index + match.Length - 2,
+                SyntaxEndIndex = match.Index + match.Length - 1,
+                Style = InlineStyle.Italic
+            },
+            outer => new InlineMarker
+            {
+                SyntaxStartIndex = outer.StartIndex,
+                StartIndex = outer.StartIndex + 2,
+                EndIndex = outer.EndIndex - 2,
+                SyntaxEndIndex = outer.EndIndex,
+                Style = InlineStyle.Bold
+            });
+
             // 加粗
             AddNestable(markers, BoldRegex, line, match =>
             {
@@ -153,11 +173,13 @@ namespace BiSheng.Editor.Parsing
         /// 某个匹配被拒后从下一个字符重新匹配，而不是跳过整段：
         /// 否则 "**粗 *斜* 粗**" 中开头的 ** 被当作空斜体吞掉后，真正的 *斜* 就再也匹配不到。
         /// </summary>
+        /// <param name="buildInner">可选：外层被接受后随之加入的内层标记（用于粗斜体），不再单独做重叠检查</param>
         private static void AddNestable(
             List<InlineMarker> markers,
             Regex regex,
             string line,
-            Func<Match, InlineMarker> build)
+            Func<Match, InlineMarker> build,
+            Func<InlineMarker, InlineMarker>? buildInner = null)
         {
             int position = 0;
             while (position < line.Length)
@@ -172,6 +194,11 @@ namespace BiSheng.Editor.Parsing
                 if (!IsIntrawordUnderscore(line, candidate) && CanPlace(markers, candidate))
                 {
                     markers.Add(candidate);
+                    if (buildInner != null)
+                    {
+                        markers.Add(buildInner(candidate));
+                    }
+
                     position = match.Index + match.Length;
                 }
                 else
@@ -250,6 +277,29 @@ namespace BiSheng.Editor.Parsing
 
             var trimmed = line.TrimStart();
             var match = HeadingRegex.Match(trimmed);
+            if (!match.Success)
+            {
+                return 0;
+            }
+
+            int indent = line.Length - trimmed.Length;
+            return indent + match.Length;
+        }
+
+        /// <summary>
+        /// 获取引用前缀总长度（含行首空白 + "&gt;" + 至多一个空白），供视觉折叠与退格删除前缀。
+        /// 与 <see cref="AnalyzeLineType"/> 的判定口径一致：缩进的引用同样识别并折叠。
+        /// 例如 "  &gt; 引用" 返回 4；非引用返回 0。
+        /// </summary>
+        public static int GetBlockQuotePrefixLength(string line)
+        {
+            if (string.IsNullOrEmpty(line))
+            {
+                return 0;
+            }
+
+            var trimmed = line.TrimStart();
+            var match = BlockQuoteRegex.Match(trimmed);
             if (!match.Success)
             {
                 return 0;

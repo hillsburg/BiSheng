@@ -208,6 +208,82 @@ public sealed class LineMarkdownAnalyzerTests
             markers.Select(m => m.Style).OrderBy(s => s));
     }
 
+    [Fact]
+    public void TripleAsterisk_IsItalicWrappingBold()
+    {
+        var markers = LineMarkdownAnalyzer.AnalyzeInlineElements("***x***");
+
+        // 外层斜体占一个 *，内层粗体占两个 *，渲染时叠加为粗斜体，且不残留字面量星号
+        AssertMarker(Single(markers, InlineStyle.Italic), 0, 1, 5, 6);
+        AssertMarker(Single(markers, InlineStyle.Bold), 1, 3, 3, 5);
+    }
+
+    [Fact]
+    public void TripleUnderscore_IsItalicWrappingBold()
+    {
+        var markers = LineMarkdownAnalyzer.AnalyzeInlineElements("___粗斜___");
+
+        AssertMarker(Single(markers, InlineStyle.Italic), 0, 1, 6, 7);
+        AssertMarker(Single(markers, InlineStyle.Bold), 1, 3, 4, 6);
+    }
+
+    [Fact]
+    public void TripleAsterisk_InSentence_ProducesExactlyTwoMarkers()
+    {
+        var markers = LineMarkdownAnalyzer.AnalyzeInlineElements("前 ***重点*** 后");
+
+        Assert.Equal(2, markers.Count);
+        AssertMarker(Single(markers, InlineStyle.Italic), 2, 3, 8, 9);
+        AssertMarker(Single(markers, InlineStyle.Bold), 3, 5, 6, 8);
+    }
+
+    [Fact]
+    public void LinkUrl_WithBalancedParentheses_IsNotTruncated()
+    {
+        const string line = "[C](https://en.wikipedia.org/wiki/C_(language))";
+        var link = Single(LineMarkdownAnalyzer.AnalyzeInlineElements(line), InlineStyle.Link);
+
+        AssertMarker(link, 0, 1, 1, line.Length - 1);
+    }
+
+    [Fact]
+    public void LinkFollowedByParenthesizedText_StopsAtOwnClosingParen()
+    {
+        var link = Single(LineMarkdownAnalyzer.AnalyzeInlineElements("[a](x) (备注)"), InlineStyle.Link);
+
+        AssertMarker(link, 0, 1, 1, 5);
+    }
+
+    [Fact]
+    public void ImageUrl_WithBalancedParentheses_IsNotTruncated()
+    {
+        const string line = "![图](a_(1).png)";
+        var image = Single(LineMarkdownAnalyzer.AnalyzeInlineElements(line), InlineStyle.Image);
+
+        Assert.Equal(line.Length - 1, image.SyntaxEndIndex);
+    }
+
+    [Theory]
+    [InlineData("> 引用", 2)]
+    [InlineData(">引用", 1)]
+    [InlineData("  > 缩进引用", 4)]
+    [InlineData(">  两个空格", 2)]
+    [InlineData("普通", 0)]
+    public void GetBlockQuotePrefixLength_IncludesIndent(string line, int expected)
+    {
+        Assert.Equal(expected, LineMarkdownAnalyzer.GetBlockQuotePrefixLength(line));
+    }
+
+    [Fact]
+    public void IndentedQuote_TypeAndPrefixAgree()
+    {
+        const string line = "  > 缩进引用";
+
+        // 行类型判为引用时，折叠长度必须覆盖缩进与 >，否则会出现“认作引用却显示原始符号”
+        Assert.Equal(LineType.BlockQuote, LineMarkdownAnalyzer.AnalyzeLineType(line));
+        Assert.Equal(4, LineMarkdownAnalyzer.GetBlockQuotePrefixLength(line));
+    }
+
     private static InlineMarker Single(List<InlineMarker> markers, InlineStyle style)
     {
         var matches = markers.Where(m => m.Style == style).ToList();

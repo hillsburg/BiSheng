@@ -157,7 +157,6 @@ namespace BiSheng.Editor.Rendering
         private void ApplyQuoteStyle(DocumentLine line, string text)
         {
             int lineStart = line.Offset;
-            int quotePrefixLen = text.StartsWith("> ") ? 2 : (text.StartsWith(">") ? 1 : 0);
 
             // 给整行添加引用样式
             ChangeLinePart(lineStart, lineStart + line.Length, element =>
