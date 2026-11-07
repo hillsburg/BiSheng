@@ -461,7 +461,7 @@ namespace BiSheng.Editor.Controls.MarkdownEditor
                 LineType.BulletList or LineType.OrderedList
                     => LineMarkdownAnalyzer.GetListPrefixLength(text),
                 LineType.BlockQuote
-                    => text.StartsWith("> ") ? 2 : (text.StartsWith(">") ? 1 : 0),
+                    => LineMarkdownAnalyzer.GetBlockQuotePrefixLength(text),
                 LineType.CodeBlock
                     => text.TrimStart().StartsWith("```") ? text.Length : 0,
                 LineType.HorizontalRule
