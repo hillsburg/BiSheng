@@ -35,8 +35,36 @@ public partial class EditorViewModel : ObservableObject
     /// <summary>距上次按键不足此时间视为「正在编辑」，同步完成时可延迟刷新导航</summary>
     public static readonly TimeSpan RecentEditWindow = TimeSpan.FromSeconds(4);
 
-    [ObservableProperty]
     private string _editorContent = string.Empty;
+
+    /// <summary>从编辑器控件读取实时全文（由宿主注入）；按键时不再每次复制全文，读取时才取</summary>
+    private Func<string>? _liveTextProvider;
+
+    /// <summary>编辑器文本已变更但尚未取回 <see cref="_editorContent"/></summary>
+    private bool _editorContentStale;
+
+    /// <summary>
+    /// 当前编辑正文。按键只标记过期，首次读取时才从编辑器取全文（长笔记每次按键复制全文是纯浪费）。
+    /// 编辑器文档只能在 UI 线程访问；在其他线程读取时返回最近一次取回的快照。
+    /// </summary>
+    public string EditorContent
+    {
+        get
+        {
+            if (_editorContentStale && _liveTextProvider != null && CanAccessEditor())
+            {
+                _editorContent = _liveTextProvider();
+                _editorContentStale = false;
+            }
+
+            return _editorContent;
+        }
+        set
+        {
+            _editorContentStale = false;
+            SetProperty(ref _editorContent, value);
+        }
+    }
 
     [ObservableProperty]
     private string _noteTitle = string.Empty;
@@ -66,7 +94,8 @@ public partial class EditorViewModel : ObservableObject
     /// <summary>编辑器内容与上次落盘不一致（含仅改 UI 未触发自动保存的情况）</summary>
     public bool IsDirty =>
         CurrentNote != null
-        && ComputeContentHash(EditorContent) != (_lastSavedContentHash ?? string.Empty);
+        && (_editorContentStale
+            || ComputeContentHash(EditorContent) != (_lastSavedContentHash ?? string.Empty));
 
     /// <summary>
     /// 用户是否处于编辑会话中（焦点在编辑器 / 近期有按键 / 有未落盘修改）。
@@ -287,9 +316,33 @@ public partial class EditorViewModel : ObservableObject
             LocalRevisionTrigger.Idle);
     }
 
+    /// <summary>由宿主注入编辑器实时文本读取方式，配合 <see cref="MarkContentChanged"/> 使用</summary>
+    public void AttachLiveTextProvider(Func<string> provider)
+    {
+        _liveTextProvider = provider;
+    }
+
+    /// <summary>编辑器文本变更（按键）：只标记过期并重置定时器，不复制全文</summary>
+    public void MarkContentChanged()
+    {
+        if (_liveTextProvider == null)
+        {
+            throw new InvalidOperationException("未注入编辑器文本读取方式，请先调用 AttachLiveTextProvider");
+        }
+
+        _editorContentStale = true;
+        RestartEditTimers();
+    }
+
     public void OnContentChanged(string newContent)
     {
         EditorContent = newContent;
+        RestartEditTimers();
+    }
+
+    /// <summary>记录编辑时间并重新开始自动保存、空闲快照两个防抖计时</summary>
+    private void RestartEditTimers()
+    {
         _lastEditUtc = DateTime.UtcNow;
         _autoSaveTimer?.Stop();
         _autoSaveTimer?.Start();
@@ -511,6 +564,13 @@ public partial class EditorViewModel : ObservableObject
     }
 
     public event Action? ContentRestored;
+
+    /// <summary>无 WPF 应用（单元测试）或当前就在 UI 线程时才能读取编辑器文档</summary>
+    private static bool CanAccessEditor()
+    {
+        var dispatcher = Application.Current?.Dispatcher;
+        return dispatcher == null || dispatcher.CheckAccess();
+    }
 
     private static string ComputeContentHash(string content)
     {

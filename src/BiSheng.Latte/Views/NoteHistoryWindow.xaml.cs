@@ -98,14 +98,22 @@ public partial class NoteHistoryWindow : Window
     /// <summary>用户手动保存当前编辑内容为本地历史版本</summary>
     private async void OnSaveCurrent(object sender, RoutedEventArgs e)
     {
-        if (_editor.SaveManualRevision())
+        try
         {
-            await LoadAsync();
-            AppDialog.Info(this, "已保存为新的本地历史版本。", "历史版本");
+            if (_editor.SaveManualRevision())
+            {
+                await LoadAsync();
+                AppDialog.Info(this, "已保存为新的本地历史版本。", "历史版本");
+            }
+            else
+            {
+                AppDialog.Info(this, "内容与上一版相同，未产生新版本。", "历史版本");
+            }
         }
-        else
+        catch (Exception ex)
         {
-            AppDialog.Info(this, "内容与上一版相同，未产生新版本。", "历史版本");
+            LogHelper.Error("手动保存历史版本失败", ex);
+            AppDialog.Error(this, ex.Message, "保存失败");
         }
     }
 

@@ -37,6 +37,20 @@
         /// 行内元素标记：(startIndex, endIndex, InlineStyle)
         /// </summary>
         public List<InlineMarker> InlineMarkers { get; set; } = new();
+
+        // ===== 增量更新缓存：只由行文本决定，行未编辑时跨按键复用 =====
+
+        /// <summary>是否为 ``` 栅栏行（代码块配对的唯一依据）</summary>
+        internal bool IsFence { get; set; }
+
+        /// <summary>正则分析结果是否已缓存；位于代码块内的行在离开代码块前不做正则分析</summary>
+        internal bool IsAnalyzed { get; set; }
+
+        /// <summary>按普通行分析得到的行类型（不考虑代码块上下文）</summary>
+        internal LineType AnalyzedType { get; set; } = LineType.Normal;
+
+        /// <summary>按普通行分析得到的行内标记（不考虑代码块上下文）</summary>
+        internal List<InlineMarker>? AnalyzedMarkers { get; set; }
     }
 
     /// <summary>

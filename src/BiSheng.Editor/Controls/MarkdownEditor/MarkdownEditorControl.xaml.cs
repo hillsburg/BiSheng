@@ -209,11 +209,15 @@ namespace BiSheng.Editor.Controls.MarkdownEditor
 
             Editor.TextArea.PreviewKeyDown += OnPreviewKeyDown;
             Editor.TextArea.Caret.PositionChanged += OnCaretPositionChanged;
+            _documentModel.LineTypesChanged += OnLineTypesChanged;
             SyncCaretToLineTransformer();
         }
 
-        /// <summary>上次同步的光标行（0-based），用于跨行时才全量 Redraw</summary>
-        private int _lastSyncedCaretLine = -1;
+        /// <summary>
+        /// 上次同步的光标所在行。记录 DocumentLine 对象而非行号：
+        /// 编辑导致行号整体移位时，仍能准确重绘离开的那一行
+        /// </summary>
+        private DocumentLine? _lastCaretLine;
 
         /// <summary>光标移动时同步行内标记显隐（当前行保持源码可见）</summary>
         private void OnCaretPositionChanged(object? sender, EventArgs e)
@@ -221,7 +225,10 @@ namespace BiSheng.Editor.Controls.MarkdownEditor
             SyncCaretToLineTransformer(redrawIfLineChanged: true);
         }
 
-        /// <summary>把光标行列写入 Transformer；跨行时刷新视图以切换标记显隐</summary>
+        /// <summary>
+        /// 把光标行列写入 Transformer；跨行时只重绘离开行与进入行——
+        /// 行内标记显隐只取决于「是否为光标行」，其余行渲染结果不受影响
+        /// </summary>
         private void SyncCaretToLineTransformer(bool redrawIfLineChanged = false)
         {
             if (_lineTransformer == null)
@@ -229,25 +236,50 @@ namespace BiSheng.Editor.Controls.MarkdownEditor
                 return;
             }
 
+            var document = Editor.Document;
             int caretOffset = Editor.CaretOffset;
-            int lineNumber = 0;
-            if (Editor.Document.TextLength > 0)
+            var clamped = Math.Min(caretOffset, Math.Max(0, document.TextLength));
+            var caretLine = document.GetLineByOffset(clamped);
+
+            _lineTransformer.SetCaretPosition(caretLine.LineNumber - 1, caretOffset);
+
+            var previousLine = _lastCaretLine;
+            _lastCaretLine = caretLine;
+
+            if (!redrawIfLineChanged || ReferenceEquals(previousLine, caretLine))
             {
-                var clamped = Math.Min(caretOffset, Math.Max(0, Editor.Document.TextLength));
-                lineNumber = Editor.Document.GetLineByOffset(clamped).LineNumber - 1;
+                return;
             }
 
-            _lineTransformer.SetCaretPosition(lineNumber, caretOffset);
+            var textView = Editor.TextArea.TextView;
+            if (previousLine != null && !previousLine.IsDeleted)
+            {
+                textView.Redraw(previousLine);
+            }
 
-            if (redrawIfLineChanged && lineNumber != _lastSyncedCaretLine)
+            textView.Redraw(caretLine);
+        }
+
+        /// <summary>
+        /// 编辑区之外的行类型变化（新增/删除 ``` 栅栏会改变其后所有行）：
+        /// AvalonEdit 只重绘被编辑的行，这里补上其余受影响的行。
+        /// 延后到 Normal 优先级执行，避免在文档变更事件中改动视图状态，且仍早于下一帧渲染
+        /// </summary>
+        private void OnLineTypesChanged(int firstLine, int lastLine)
+        {
+            Dispatcher.BeginInvoke(DispatcherPriority.Normal, () =>
             {
-                _lastSyncedCaretLine = lineNumber;
-                Editor.TextArea.TextView.Redraw();
-            }
-            else if (!redrawIfLineChanged)
-            {
-                _lastSyncedCaretLine = lineNumber;
-            }
+                var document = Editor.Document;
+                int lineCount = document.LineCount;
+                if (firstLine >= lineCount)
+                {
+                    return;
+                }
+
+                var start = document.GetLineByNumber(firstLine + 1);
+                var end = document.GetLineByNumber(Math.Min(lastLine, lineCount - 1) + 1);
+                Editor.TextArea.TextView.Redraw(start.Offset, end.EndOffset - start.Offset);
+            });
         }
 
         // ===== 滚动条自动显隐实现 =====

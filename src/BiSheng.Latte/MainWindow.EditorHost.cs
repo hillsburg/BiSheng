@@ -21,11 +21,13 @@ public partial class MainWindow
     /// <summary>初始化编辑器事件、笔记切换与图片解析</summary>
     private void InitializeEditorHost()
     {
+        // 按键只标记过期，正文在自动保存等真正需要时才取（长笔记避免每键复制全文）
+        _vm.Editor.AttachLiveTextProvider(() => NoteEditor.Text);
         NoteEditor.TextEditor.TextChanged += (_, _) =>
         {
             if (!_isLoadingNote)
             {
-                _vm.Editor.OnContentChanged(NoteEditor.Text);
+                _vm.Editor.MarkContentChanged();
                 ScheduleOutlineRefresh();
             }
         };
