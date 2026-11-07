@@ -243,6 +243,9 @@ namespace BiSheng.Editor.Controls.MarkdownEditor
 
             _lineTransformer.SetCaretPosition(caretLine.LineNumber - 1, caretOffset);
 
+            // 光标行的图片退回源码，才能编辑 () 中的地址；下面的跨行重绘会让图片在离开后恢复
+            _imageRenderer?.SetCurrentLine(caretLine.LineNumber - 1);
+
             var previousLine = _lastCaretLine;
             _lastCaretLine = caretLine;
 

@@ -16,13 +16,18 @@ namespace BiSheng.Editor.Rendering
 {
     /// <summary>
     /// 图片渲染器：识别 ![alt](url) 语法，在非当前行注入图片 UI
-    /// 支持本地文件、网络图片、以及 bisheng://img/{uuid} 自定义 URI Scheme
+    /// 支持本地文件、网络图片、以及 bisheng://img/{uuid} 自定义 URI Scheme。
+    /// 识别结果取自文档模型中的 Image 行内标记（与 LineMarkdownAnalyzer 同一套规则：
+    /// 行内代码中的语法不渲染、URL 支持一层成对括号），不在此处重复解析。
+    /// 光标所在行保持源码可见，否则整段语法被图片控件替换后无法把光标移进 () 编辑地址。
     /// </summary>
     public class ImageRenderer : VisualLineElementGenerator
     {
         private readonly MarkdownDocumentModel _documentModel;
         private readonly MarkdownTheme _theme;
         private readonly IImageResolver? _imageResolver;
+
+        /// <summary>当前光标行号（0-based），-1 表示未知；该行不渲染图片</summary>
         private int _currentLineNumber = -1;
 
         private readonly Dictionary<string, BitmapSource> _imageCache = new();
@@ -56,6 +61,9 @@ namespace BiSheng.Editor.Rendering
             _textEditor = editor;
         }
 
+        /// <summary>
+        /// 更新光标行号（0-based）。调用方负责在跨行时重绘离开行与进入行，图片据此显隐
+        /// </summary>
         public void SetCurrentLine(int lineNumber)
         {
             _currentLineNumber = lineNumber;
@@ -66,46 +74,92 @@ namespace BiSheng.Editor.Rendering
             var doc = CurrentContext.Document;
             var line = doc.GetLineByOffset(startOffset);
             int lineIndex = line.LineNumber - 1;
-
-            var state = _documentModel.GetLineState(lineIndex);
-            if (state?.Type == LineType.CodeBlockContent || state?.Type == LineType.CodeBlock)
+            if (lineIndex == _currentLineNumber)
+            {
                 return -1;
+            }
 
             var text = doc.GetText(line.Offset, line.Length);
             int relativeOffset = startOffset - line.Offset;
 
-            int imgStart = text.IndexOf("![", relativeOffset);
-            if (imgStart >= 0)
-                return line.Offset + imgStart;
+            // 代码块行的标记已被文档模型清空，这里天然不会命中
+            int first = -1;
+            foreach (var marker in GetImageMarkers(lineIndex))
+            {
+                if (marker.SyntaxStartIndex < relativeOffset)
+                {
+                    continue;
+                }
 
-            return -1;
+                if ((first < 0 || marker.SyntaxStartIndex < first)
+                    && TryReadImage(text, marker, out _, out _))
+                {
+                    first = marker.SyntaxStartIndex;
+                }
+            }
+
+            return first < 0 ? -1 : line.Offset + first;
         }
 
         public override VisualLineElement? ConstructElement(int offset)
         {
             var doc = CurrentContext.Document;
             var line = doc.GetLineByOffset(offset);
+            int lineIndex = line.LineNumber - 1;
             var text = doc.GetText(line.Offset, line.Length);
             int relativeOffset = offset - line.Offset;
 
-            if (relativeOffset + 2 > text.Length) return null;
-            if (text[relativeOffset] != '!' || text[relativeOffset + 1] != '[') return null;
+            var marker = GetImageMarkers(lineIndex)
+                .FirstOrDefault(m => m.SyntaxStartIndex == relativeOffset);
+            if (marker == null || !TryReadImage(text, marker, out var altText, out var url))
+            {
+                return null;
+            }
 
-            int closeBracket = text.IndexOf(']', relativeOffset + 2);
-            if (closeBracket < 0) return null;
-            if (closeBracket + 1 >= text.Length || text[closeBracket + 1] != '(') return null;
-            int closeParen = text.IndexOf(')', closeBracket + 2);
-            if (closeParen < 0) return null;
-
-            string altText = text.Substring(relativeOffset + 2, closeBracket - relativeOffset - 2);
-            string url = text.Substring(closeBracket + 2, closeParen - closeBracket - 2);
-            int elementLength = closeParen - relativeOffset + 1;
+            int elementLength = marker.SyntaxEndIndex - marker.SyntaxStartIndex + 1;
 
             // 记录图片在文档中的偏移，用于点击时定位光标
-            int imageDocOffset = offset;
-
-            var imageControl = CreateImageControl(url, altText, imageDocOffset, elementLength);
+            var imageControl = CreateImageControl(url, altText, offset, elementLength);
             return new InlineObjectElement(elementLength, imageControl);
+        }
+
+        private IEnumerable<InlineMarker> GetImageMarkers(int lineIndex)
+        {
+            var markers = _documentModel.GetLineState(lineIndex)?.InlineMarkers;
+            if (markers == null)
+            {
+                return Enumerable.Empty<InlineMarker>();
+            }
+
+            return markers.Where(m => m.Style == InlineStyle.Image);
+        }
+
+        /// <summary>
+        /// 从 Image 标记覆盖的 ![alt](url) 中取出 alt 与 url。
+        /// url 为空白时返回 false：刚输入 ![]( ) 还没填地址，不应渲染成「图片不存在」占位
+        /// </summary>
+        private static bool TryReadImage(string text, InlineMarker marker, out string altText, out string url)
+        {
+            altText = string.Empty;
+            url = string.Empty;
+
+            int start = marker.SyntaxStartIndex;
+            int end = marker.SyntaxEndIndex;
+            if (start < 0 || end >= text.Length || end - start < 4)
+            {
+                return false;
+            }
+
+            // alt 不含 ']'（与解析器正则一致），第一个 ']' 即 alt 的结束
+            int closeBracket = text.IndexOf(']', start + 2);
+            if (closeBracket < 0 || closeBracket + 1 >= end || text[closeBracket + 1] != '(')
+            {
+                return false;
+            }
+
+            altText = text.Substring(start + 2, closeBracket - start - 2);
+            url = text.Substring(closeBracket + 2, end - closeBracket - 2).Trim();
+            return url.Length > 0;
         }
 
         private UIElement CreateImageControl(string url, string altText, int docOffset, int elementLength)

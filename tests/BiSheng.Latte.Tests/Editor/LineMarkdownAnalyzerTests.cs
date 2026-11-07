@@ -264,6 +264,18 @@ public sealed class LineMarkdownAnalyzerTests
     }
 
     [Theory]
+    [InlineData("![]()")]
+    [InlineData("![说明]()")]
+    [InlineData("`![图](a.png)`")]
+    public void EmptyUrlOrCodeSpanImage_IsNotAnImageMarker(string line)
+    {
+        // 渲染层只对 Image 标记注入图片控件：空地址或代码中的语法不应出现「图片不存在」占位
+        Assert.DoesNotContain(
+            LineMarkdownAnalyzer.AnalyzeInlineElements(line),
+            m => m.Style == InlineStyle.Image);
+    }
+
+    [Theory]
     [InlineData("> 引用", 2)]
     [InlineData(">引用", 1)]
     [InlineData("  > 缩进引用", 4)]
