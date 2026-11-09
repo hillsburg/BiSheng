@@ -28,6 +28,7 @@ Versions are indicative of the tree at last update; see each `.csproj` for the p
 | NLog | Latte | [NLog/NLog](https://github.com/NLog/NLog) | BSD-3-Clause |
 | Otp.NET | Server | [kspearrin/Otp.NET](https://github.com/kspearrin/Otp.NET) | MIT |
 | QRCoder | Server | [codebude/QRCoder](https://github.com/codebude/QRCoder) | MIT |
+| Fido2 (+ Fido2.Models) | Server | [passwordless-lib/fido2-net-lib](https://github.com/passwordless-lib/fido2-net-lib) | MIT |
 | Swashbuckle.AspNetCore | Server | Swagger / OpenAPI UI | MIT |
 | System.Text.Json | Shared | .NET | MIT |
 | System.Security.Cryptography.ProtectedData | Latte | .NET | MIT |
