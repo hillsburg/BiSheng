@@ -209,6 +209,11 @@ namespace BiSheng.Editor.Controls.MarkdownEditor
 
             Editor.TextArea.PreviewKeyDown += OnPreviewKeyDown;
             Editor.TextArea.Caret.PositionChanged += OnCaretPositionChanged;
+            // AvalonEdit 在松开时完成选区命中并把事件标成已处理；之后才补做按住期间跳过的同步
+            Editor.TextArea.AddHandler(
+                MouseLeftButtonUpEvent,
+                new MouseButtonEventHandler(OnTextAreaMouseLeftButtonUp),
+                handledEventsToo: true);
             _documentModel.LineTypesChanged += OnLineTypesChanged;
             SyncCaretToLineTransformer();
         }
@@ -219,8 +224,24 @@ namespace BiSheng.Editor.Controls.MarkdownEditor
         /// </summary>
         private DocumentLine? _lastCaretLine;
 
-        /// <summary>光标移动时同步行内标记显隐（当前行保持源码可见）</summary>
+        /// <summary>
+        /// 光标移动时同步行内标记显隐（当前行保持源码可见）。
+        /// 左键按住期间不同步：图片展开或收起会改变行高，而 AvalonEdit 松开时仍用按下时的屏幕坐标做选区命中，
+        /// 行高一变，同一坐标会落到图片行，光标被拉回图片语法并选中两行。
+        /// 跳过时 _lastCaretLine 仍是旧行，松开后的一次同步会按跨行规则重绘离开行与进入行。
+        /// </summary>
         private void OnCaretPositionChanged(object? sender, EventArgs e)
+        {
+            if (Mouse.LeftButton == MouseButtonState.Pressed)
+            {
+                return;
+            }
+
+            SyncCaretToLineTransformer(redrawIfLineChanged: true);
+        }
+
+        /// <summary>鼠标操作结束，补做按住期间跳过的光标行同步</summary>
+        private void OnTextAreaMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
         {
             SyncCaretToLineTransformer(redrawIfLineChanged: true);
         }
