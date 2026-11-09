@@ -19,6 +19,11 @@ if ([string]::IsNullOrWhiteSpace($Version)) {
     $Version = & (Join-Path $PSScriptRoot "Get-BiShengVersion.ps1") -RepoRoot $repoRoot
 }
 
+# AssemblyVersion 写成 $(BiShengVersion).0，只能是数字三段式
+if ($Version -notmatch '^\d+\.\d+\.\d+$') {
+    throw "版本号须为 x.y.z（当前: $Version）。不能带 -beta 等后缀。"
+}
+
 if ([string]::IsNullOrWhiteSpace($OutputDir)) {
     $OutputDir = Join-Path $repoRoot "artifacts\release\$Version"
 }
@@ -48,10 +53,13 @@ if ($SelfContained) {
 }
 
 Write-Host "==> publish Latte $Version ($Runtime)"
+# FileVersion / InformationalVersion 绑在 BiShengVersion 上，只传 Version 盖不住。
+# 命令行 BiShengVersion 是全局属性，优先于 Directory.Build.props，tag 因此进入 exe。
 dotnet publish $csproj `
     -c $Configuration `
     -r $Runtime `
     @selfContainedArgs `
+    -p:BiShengVersion=$Version `
     -p:Version=$Version `
     -o $publishDir
 if ($LASTEXITCODE -ne 0) {

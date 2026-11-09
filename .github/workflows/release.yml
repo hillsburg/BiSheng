@@ -54,8 +54,8 @@ jobs:
             }
             $v = $ref.Substring(1)
           }
-          if ($v -notmatch '^\d+\.\d+\.\d+') {
-            throw "版本号格式应为 x.y.z（当前: $v）"
+          if ($v -notmatch '^\d+\.\d+\.\d+$') {
+            throw "版本号格式应为 x.y.z，且不能带预发布后缀（当前: $v）"
           }
           Add-Content -Path $env:GITHUB_OUTPUT -Value "version=$v"
           Write-Host "Release version: $v"
