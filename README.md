@@ -27,6 +27,8 @@
 - **Note history & trash** — local revision history and soft-delete with purge
 - **Offline-first** — works without a server; data stored in local SQLite (`local.db`)
 - **Local backups** — scheduled SQLite backups and integrity checks
+- **System tray & single instance** — closing the window hides it to the tray while sync keeps running (configurable); launching again brings the existing window back
+- **In-app updates** — Velopack-based update check under **关于**
 
 ### Sync server (`BiSheng.Server`) — optional
 
@@ -34,7 +36,9 @@
 - **Incremental sync** — push/pull with version tracking and conflict detection
 - **SignalR** — real-time change notifications to connected clients
 - **Image uploads** — note images stored server-side and synced to clients
-- **API key auth** — per-device keys; TOTP support for admin login
+- **API key auth** — per-device keys for clients
+- **Admin security** — password + TOTP login, optional passkeys (WebAuthn / FIDO2), account lockout, rate limiting, "sign out all devices"
+- **Ops endpoints** — anonymous `/health` probe, read-only update check on the dashboard, client/server version compatibility check
 - **SQLite storage** — single-file `bisheng.db` plus `uploads/` directory
 
 ---
@@ -97,7 +101,7 @@ Framework-dependent publish:
 dotnet publish src/BiSheng.Latte/BiSheng.Latte.csproj -c Release -r win-x64 --self-contained false
 ```
 
-Latte and Server share one product version (`BiShengVersion` in `Directory.Build.props`). One GitHub Release ships both:
+Latte and Server ship in one GitHub Release. The release version is the git tag (`vX.Y.Z`); `BiShengVersion` in `Directory.Build.props` is only the default for local `dotnet run`. One GitHub Release ships both:
 
 ```powershell
 .\scripts\release\pack-all.ps1
@@ -193,6 +197,7 @@ BiSheng stands on the shoulders of many open-source projects. Thank you to their
 | [Open XML SDK](https://github.com/dotnet/Open-XML-SDK) | Word export | MIT |
 | [Otp.NET](https://github.com/kspearrin/Otp.NET) | Admin TOTP | MIT |
 | [QRCoder](https://github.com/codebude/QRCoder) | TOTP setup QR codes | MIT |
+| [fido2-net-lib](https://github.com/passwordless-lib/fido2-net-lib) | Admin passkeys (WebAuthn / FIDO2) | MIT |
 | ASP.NET Core / SignalR | Sync server & realtime | MIT |
 
 Full package inventory and notices: [THIRD-PARTY-NOTICES.md](THIRD-PARTY-NOTICES.md).

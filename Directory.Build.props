@@ -1,5 +1,6 @@
 <Project>
-  <!-- Latte 与 Server 共用产品版本；GitHub Release tag 建议 v$(BiShengVersion) -->
+  <!-- 本地 dotnet run、以及未传 -Version 打包时的默认版本。
+       GitHub Release 以 tag vX.Y.Z 为准，打包脚本用 -p:BiShengVersion 覆盖这里。 -->
   <PropertyGroup>
     <BiShengVersion>0.1.1</BiShengVersion>
   </PropertyGroup>

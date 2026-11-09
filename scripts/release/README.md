@@ -1,52 +1,37 @@
 # BiSheng 统一发版（Latte + Server）
 
-Latte 与 Server **共用** `Directory.Build.props` 中的 `BiShengVersion`。一次 GitHub Release（tag `v*`）包含两端产物。
+一次 GitHub Release（tag `vX.Y.Z`）包含 Latte 与 Server。安装包版本、Velopack 版本和程序集文件版本都来自这个 tag。
 
-## 发版检查清单（必读）
+[`Directory.Build.props`](../../Directory.Build.props) 里的 `BiShengVersion` 只用于本地 `dotnet run`，以及不传 `-Version` 时的本地打包。发版不用改它。
 
-推 tag 发版时，**两处版本号必须一致**，否则容易半年后对不上：
+## 发版
 
-| # | 改什么 | 示例 |
-|---|--------|------|
-| 1 | 根目录 [`Directory.Build.props`](../../Directory.Build.props) 里的 **`BiShengVersion`**，并提交到要发版的 commit（通常先合入 `main`） | `0.1.2` |
-| 2 | 在该 commit 上打 **同号** tag 并推送 | `v0.1.2`（必须带 `v` 前缀） |
-
-```text
-Directory.Build.props  BiShengVersion = 0.1.2
-git tag / GitHub Release              = v0.1.2
-```
-
-推荐流程：
+在要发布的提交上打附注 tag 并推送。CI 去掉 `v` 后调用 `pack-all.ps1 -Version`，打包再传 `-p:BiShengVersion`，盖过 props 里的旧号。
 
 ```bash
-# 1. 改版本并合入 main（PR 或直接提交）
-#    编辑 Directory.Build.props → <BiShengVersion>0.1.2</BiShengVersion>
-
-# 2. 在已包含该改动的 commit 上打 tag
 git checkout main && git pull
-git tag v0.1.2
-git push origin v0.1.2
+git tag -a v0.1.3 -m "v0.1.3"
+git push origin v0.1.3
 ```
 
-说明：
+约束：
 
-- CI（`release.yml`）会用 **tag 去掉 `v` 后的版本** 调用 `pack-all.ps1 -Version …`，安装包/程序集版本以 tag 为准。
-- **`BiShengVersion` 仍必须改**：本地默认打包、未传 `-Version` 时读 props；仓库里也应留下「当前版本」的单一真相，避免下次发版搞混。
-- **不要**只推 tag 不改 props，也不要 props 已是 `0.1.2` 却打成 `v0.1.1`。
-- 若 tag 打错：删远程 tag 后改对再推（注意已产生的 Release / 用户是否已装该版）。
+- tag 必须是 `v` + `x.y.z`，例如 `v0.1.3`。`AssemblyVersion` 写成 `x.y.z.0`，不能带 `-beta` 这类后缀。
+- 只在本地打 tag 不会发版，必须 `git push origin vX.Y.Z`。
+- 若 tag 打错：删远程 tag 后改对再推（注意已产生的 Release，以及用户是否已装该版）。
 
-`workflow_dispatch` 手工填版本时同样建议先改 props 再跑，避免仓库与产物长期不一致。
+Actions 里也可以用 `workflow_dispatch` 手工填版本号（不带 `v`），规则相同。
 
 ## 本地打包
 
 前置：.NET 8 SDK；`dotnet tool install -g vpk`（与 NuGet `Velopack` 1.2.x 对齐）。
 
 ```powershell
-# 默认读取 Directory.Build.props 的 BiShengVersion
+# 默认读取 Directory.Build.props 的 BiShengVersion（本地默认版本）
 .\scripts\release\pack-all.ps1
 
-# 或显式指定（仍建议先改 props 再打包，避免仓库漂移）
-.\scripts\release\pack-all.ps1 -Version 0.1.2
+# 显式指定时，程序集版本与 Velopack 版本都用这个号，不必先改 props
+.\scripts\release\pack-all.ps1 -Version 0.1.3
 ```
 
 产物目录：`artifacts/release/<version>/`
@@ -59,7 +44,7 @@ git push origin v0.1.2
 
 ## CI 发版
 
-见上文检查清单。工作流：`.github/workflows/release.yml`（先测试，再打包并 `gh release create --generate-notes`）。  
+工作流：`.github/workflows/release.yml`（先测试，再打包并 `gh release create --generate-notes`）。  
 Release 说明可事后在 GitHub 上 Edit。
 
 也可在 Actions 里用 `workflow_dispatch` 填入版本号（不带 `v`）。
