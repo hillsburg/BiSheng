@@ -14,6 +14,8 @@ namespace BiSheng.Editor.Parsing
         private static readonly Regex BulletListRegex = new(@"^(\s*)([-*+])\s+", RegexOptions.Compiled);
         // 有序列表: 数字. 开头
         private static readonly Regex OrderedListRegex = new(@"^(\s*)(\d+)\.\s+", RegexOptions.Compiled);
+        // 任务勾选框: 紧跟在列表标记之后的 [ ] / [x] / [X]，其后须为空白或行尾（GFM 任务列表）
+        private static readonly Regex TaskBoxRegex = new(@"\G\[([ xX])\](?:[ \t]+|$)", RegexOptions.Compiled);
         // 引用: > 开头
         private static readonly Regex BlockQuoteRegex = new(@"^>\s?", RegexOptions.Compiled);
         // 代码块: ``` 开头
@@ -318,32 +320,42 @@ namespace BiSheng.Editor.Parsing
         }
 
         /// <summary>
-        /// 解析列表前缀：缩进、整段前缀长度、有序序号（无序为 null）
+        /// 解析列表前缀：缩进、整段前缀长度、有序序号（无序为 null）及任务勾选框。
+        /// 任务项的前缀包含 "[ ] "，使隐藏、标记绘制与退格删前缀都把勾选框当作前缀的一部分。
         /// </summary>
         public static bool TryGetListPrefixInfo(string line, out ListPrefixInfo info)
         {
             var bulletMatch = BulletListRegex.Match(line);
             if (bulletMatch.Success)
             {
-                info = new ListPrefixInfo(
-                    bulletMatch.Groups[1].Length,
-                    bulletMatch.Length,
-                    orderedNumber: null);
+                info = WithTaskBox(line, bulletMatch.Groups[1].Length, bulletMatch.Length, orderedNumber: null);
                 return true;
             }
 
             var orderedMatch = OrderedListRegex.Match(line);
             if (orderedMatch.Success)
             {
-                info = new ListPrefixInfo(
-                    orderedMatch.Groups[1].Length,
-                    orderedMatch.Length,
+                info = WithTaskBox(line, orderedMatch.Groups[1].Length, orderedMatch.Length,
                     orderedMatch.Groups[2].Value);
                 return true;
             }
 
             info = default;
             return false;
+        }
+
+        /// <summary>列表标记之后若紧跟勾选框，把勾选框并入前缀并记录其位置与状态</summary>
+        private static ListPrefixInfo WithTaskBox(string line, int indent, int markerLength, string? orderedNumber)
+        {
+            var taskMatch = TaskBoxRegex.Match(line, markerLength);
+            if (!taskMatch.Success)
+            {
+                return new ListPrefixInfo(indent, markerLength, orderedNumber);
+            }
+
+            bool isChecked = taskMatch.Groups[1].Value != " ";
+            return new ListPrefixInfo(indent, markerLength + taskMatch.Length, orderedNumber,
+                markerLength, isChecked);
         }
     }
 
@@ -362,12 +374,31 @@ namespace BiSheng.Editor.Parsing
         /// <summary>是否为有序列表</summary>
         public bool IsOrdered => OrderedNumber != null;
 
-        /// <summary>构造前缀信息</summary>
+        /// <summary>是否为任务项（带 [ ] / [x] 勾选框）</summary>
+        public bool IsTask { get; }
+
+        /// <summary>勾选框 '[' 在行内的偏移，仅 <see cref="IsTask"/> 为真时有效；勾选状态字符位于其后一位</summary>
+        public int TaskBoxStart { get; }
+
+        /// <summary>任务项是否已勾选</summary>
+        public bool IsChecked { get; }
+
+        /// <summary>构造普通列表前缀信息</summary>
         public ListPrefixInfo(int indentLength, int prefixLength, string? orderedNumber)
         {
             IndentLength = indentLength;
             PrefixLength = prefixLength;
             OrderedNumber = orderedNumber;
+        }
+
+        /// <summary>构造任务项前缀信息，前缀长度已包含勾选框及其后空白</summary>
+        public ListPrefixInfo(int indentLength, int prefixLength, string? orderedNumber,
+            int taskBoxStart, bool isChecked)
+            : this(indentLength, prefixLength, orderedNumber)
+        {
+            IsTask = true;
+            TaskBoxStart = taskBoxStart;
+            IsChecked = isChecked;
         }
     }
 }

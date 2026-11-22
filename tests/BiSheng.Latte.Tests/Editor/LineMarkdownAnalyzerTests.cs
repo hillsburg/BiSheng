@@ -69,6 +69,38 @@ public sealed class LineMarkdownAnalyzerTests
         Assert.Equal(0, LineMarkdownAnalyzer.GetListPrefixLength("普通文字"));
     }
 
+    // ===== 任务勾选框：前缀含勾选框，点击切换依赖 TaskBoxStart 指向 '[' =====
+
+    [Theory]
+    [InlineData("- [ ] 待办", 0, 6, 2, false)]
+    [InlineData("- [x] 完成", 0, 6, 2, true)]
+    [InlineData("* [X] 大写", 0, 6, 2, true)]
+    [InlineData("  - [ ] 嵌套", 2, 8, 4, false)]
+    [InlineData("1. [x] 有序", 0, 7, 3, true)]
+    [InlineData("- [ ]", 0, 5, 2, false)]
+    public void TryGetListPrefixInfo_TaskItem_IncludesBoxInPrefix(
+        string line, int indent, int prefix, int boxStart, bool isChecked)
+    {
+        Assert.True(LineMarkdownAnalyzer.TryGetListPrefixInfo(line, out var info));
+        Assert.True(info.IsTask);
+        Assert.Equal(indent, info.IndentLength);
+        Assert.Equal(prefix, info.PrefixLength);
+        Assert.Equal(boxStart, info.TaskBoxStart);
+        Assert.Equal(isChecked, info.IsChecked);
+    }
+
+    [Theory]
+    [InlineData("- [ ]没有空格")]
+    [InlineData("- [y] 非法状态")]
+    [InlineData("- [] 空括号")]
+    [InlineData("- 文字 [ ] 在中间")]
+    public void TryGetListPrefixInfo_NotTaskBox_KeepsPlainListPrefix(string line)
+    {
+        Assert.True(LineMarkdownAnalyzer.TryGetListPrefixInfo(line, out var info));
+        Assert.False(info.IsTask);
+        Assert.Equal(2, info.PrefixLength);
+    }
+
     // ===== 行内标记：单一语法的偏移 =====
 
     [Fact]

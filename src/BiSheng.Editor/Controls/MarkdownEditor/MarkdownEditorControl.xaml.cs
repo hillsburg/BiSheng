@@ -209,6 +209,10 @@ namespace BiSheng.Editor.Controls.MarkdownEditor
 
             Editor.TextArea.PreviewKeyDown += OnPreviewKeyDown;
             Editor.TextArea.Caret.PositionChanged += OnCaretPositionChanged;
+            // 勾选框画在背景层，没有自己的控件：隧道阶段先于 AvalonEdit 的选区处理做命中
+            Editor.TextArea.PreviewMouseLeftButtonDown += OnTextAreaPreviewMouseLeftButtonDown;
+            // 挂在 TextView 上，冒泡时先于 TextArea 把光标设成 IBeam
+            Editor.TextArea.TextView.QueryCursor += OnTextViewQueryCursor;
             _documentModel.LineTypesChanged += OnLineTypesChanged;
             SyncCaretToLineTransformer();
         }
@@ -223,6 +227,70 @@ namespace BiSheng.Editor.Controls.MarkdownEditor
         private void OnCaretPositionChanged(object? sender, EventArgs e)
         {
             SyncCaretToLineTransformer(redrawIfLineChanged: true);
+        }
+
+        /// <summary>勾选框命中区向外扩展的像素，方框较小时也容易点中</summary>
+        private const double TaskBoxHitPadding = 3;
+
+        /// <summary>
+        /// 点中任务勾选框时切换 [ ] / [x]：只替换状态字符，光标与选区不动，可撤销。
+        /// 事件被吞掉，AvalonEdit 不会把光标移进隐藏的前缀，也不会开始拖选。
+        /// </summary>
+        private void OnTextAreaPreviewMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            if (Editor.IsReadOnly || !TryHitTaskBox(e, out var line, out var info))
+            {
+                return;
+            }
+
+            int stateOffset = line.Offset + info.TaskBoxStart + 1;
+            Editor.Document.Replace(stateOffset, 1, info.IsChecked ? " " : "x");
+            e.Handled = true;
+        }
+
+        /// <summary>悬停在勾选框上显示手形，提示可点击</summary>
+        private void OnTextViewQueryCursor(object sender, QueryCursorEventArgs e)
+        {
+            // 视觉行失效时取行会触发重建；与 AvalonEdit 一致，等重建后光标会被重新查询
+            if (Editor.IsReadOnly || !Editor.TextArea.TextView.VisualLinesValid)
+            {
+                return;
+            }
+
+            if (TryHitTaskBox(e, out _, out _))
+            {
+                e.Cursor = Cursors.Hand;
+                e.Handled = true;
+            }
+        }
+
+        /// <summary>按鼠标位置找到所在视觉行，判断是否落在该行勾选框内</summary>
+        private bool TryHitTaskBox(MouseEventArgs e, out DocumentLine line, out ListPrefixInfo info)
+        {
+            line = null!;
+            info = default;
+            if (_backgroundRenderer == null || Editor.Document == null)
+            {
+                return false;
+            }
+
+            var textView = Editor.TextArea.TextView;
+            var position = e.GetPosition(textView);
+            var visualLine = textView.GetVisualLineFromVisualTop(position.Y + textView.ScrollOffset.Y);
+            if (visualLine == null
+                || !_backgroundRenderer.TryGetTaskBoxRect(textView, visualLine, out var box, out info))
+            {
+                return false;
+            }
+
+            box.Inflate(TaskBoxHitPadding, TaskBoxHitPadding);
+            if (!box.Contains(position))
+            {
+                return false;
+            }
+
+            line = visualLine.FirstDocumentLine;
+            return true;
         }
 
         /// <summary>

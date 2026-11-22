@@ -10,7 +10,7 @@ using ICSharpCode.AvalonEdit.Rendering;
 namespace BiSheng.Editor.Rendering
 {
     /// <summary>
-    /// 行背景渲染器：代码块/引用块背景、水平分割线、列表 Bullet 绘制
+    /// 行背景渲染器：代码块/引用块背景、水平分割线、列表 Bullet / 序号 / 任务勾选框绘制
     /// </summary>
     public class LineBackgroundRenderer : IBackgroundRenderer
     {
@@ -23,6 +23,12 @@ namespace BiSheng.Editor.Rendering
 
         /// <summary>无序列表 Bullet 相对正文字号的倍率上限</summary>
         private const double BulletFontScale = 1.15;
+
+        /// <summary>勾选框边长相对正文字号的倍率</summary>
+        private const double TaskBoxFontScale = 0.9;
+
+        /// <summary>勾选框中心距首行基线的高度（以字号计），使方框与正文字形垂直居中</summary>
+        private const double TaskBoxCenterAboveBaseline = 0.36;
 
         public LineBackgroundRenderer(MarkdownDocumentModel documentModel, MarkdownTheme theme)
         {
@@ -151,6 +157,12 @@ namespace BiSheng.Editor.Rendering
                 return;
             }
 
+            if (info.IsTask)
+            {
+                DrawTaskBox(dc, textView, visualLine);
+                return;
+            }
+
             DrawListMarker(
                 dc,
                 visualLine,
@@ -176,6 +188,13 @@ namespace BiSheng.Editor.Rendering
                 return;
             }
 
+            // 与 GitHub 一致：任务项用勾选框取代序号
+            if (info.IsTask)
+            {
+                DrawTaskBox(dc, textView, visualLine);
+                return;
+            }
+
             DrawListMarker(
                 dc,
                 visualLine,
@@ -185,6 +204,102 @@ namespace BiSheng.Editor.Rendering
                 markerText: $"{info.OrderedNumber}.",
                 fontWeight: FontWeights.Normal,
                 preferredFontSize: _theme.BaseFontSize);
+        }
+
+        /// <summary>
+        /// 计算任务项勾选框在 TextView 视口中的矩形。绘制与点击命中共用此方法，保证画的位置就是能点的位置。
+        /// 方框在前缀占位内右对齐（与 Bullet 相同），垂直方向按首行基线对齐正文字形中心。
+        /// </summary>
+        /// <param name="textView">所属文本视图</param>
+        /// <param name="visualLine">待计算的视觉行</param>
+        /// <param name="box">勾选框矩形（视口坐标）</param>
+        /// <param name="info">该行列表前缀信息，含勾选框位置与状态</param>
+        /// <returns>该行是带勾选框的任务项且几何可用时返回 true</returns>
+        public bool TryGetTaskBoxRect(TextView textView, VisualLine visualLine, out Rect box, out ListPrefixInfo info)
+        {
+            box = Rect.Empty;
+            var docLine = visualLine.FirstDocumentLine;
+            var text = textView.Document.GetText(docLine.Offset, docLine.Length);
+            if (!LineMarkdownAnalyzer.TryGetListPrefixInfo(text, out info) || !info.IsTask)
+            {
+                return false;
+            }
+
+            // 代码块内的 "- [ ]" 是字面量，不能当成任务项
+            var state = _documentModel.GetLineState(docLine.LineNumber - 1);
+            if (state == null || state.Type is not (LineType.BulletList or LineType.OrderedList))
+            {
+                return false;
+            }
+
+            if (!TryGetPrefixVisualColumns(
+                    visualLine,
+                    info.IndentLength,
+                    info.PrefixLength,
+                    out var markerStartColumn,
+                    out var prefixEndColumn))
+            {
+                return false;
+            }
+
+            var firstTextLine = visualLine.TextLines[0];
+            double lineStartX = visualLine.GetTextLineVisualXPosition(firstTextLine, 0);
+            double markerSlotStartX = visualLine.GetTextLineVisualXPosition(firstTextLine, markerStartColumn);
+            double contentX = visualLine.GetTextLineVisualXPosition(firstTextLine, prefixEndColumn);
+
+            // 占位不够宽时缩小方框，不越过正文左缘
+            double side = Math.Min(
+                _theme.BaseFontSize * TaskBoxFontScale,
+                contentX - ListMarkerContentGap - lineStartX);
+            if (side <= 2)
+            {
+                return false;
+            }
+
+            double lineTop = visualLine.GetTextLineVisualYPosition(firstTextLine, VisualYPosition.TextTop)
+                             - textView.ScrollOffset.Y;
+            double centerY = lineTop + firstTextLine.Baseline - _theme.BaseFontSize * TaskBoxCenterAboveBaseline;
+            double x = PlaceMarkerX(lineStartX, markerSlotStartX, contentX, side);
+            box = new Rect(x, centerY - side / 2, side, side);
+            return true;
+        }
+
+        /// <summary>绘制勾选框：未勾选为描边方框，已勾选为强调色填充加白色对勾</summary>
+        private void DrawTaskBox(DrawingContext dc, TextView textView, VisualLine visualLine)
+        {
+            if (!TryGetTaskBoxRect(textView, visualLine, out var box, out var info))
+            {
+                return;
+            }
+
+            double radius = box.Width * 0.18;
+            if (!info.IsChecked)
+            {
+                var border = new Pen(_theme.BulletColor, 1.2);
+                var inset = new Rect(box.X + 0.6, box.Y + 0.6, box.Width - 1.2, box.Height - 1.2);
+                dc.DrawRoundedRectangle(null, border, inset, radius, radius);
+                return;
+            }
+
+            dc.DrawRoundedRectangle(_theme.LinkColor, null, box, radius, radius);
+
+            // 对勾三点按方框比例取，任意字号下形状一致
+            var check = new StreamGeometry();
+            using (var ctx = check.Open())
+            {
+                ctx.BeginFigure(new Point(box.X + box.Width * 0.24, box.Y + box.Height * 0.52), false, false);
+                ctx.LineTo(new Point(box.X + box.Width * 0.43, box.Y + box.Height * 0.71), true, false);
+                ctx.LineTo(new Point(box.X + box.Width * 0.77, box.Y + box.Height * 0.31), true, false);
+            }
+
+            check.Freeze();
+            var checkPen = new Pen(Brushes.White, Math.Max(1.4, box.Width * 0.13))
+            {
+                StartLineCap = PenLineCap.Round,
+                EndLineCap = PenLineCap.Round,
+                LineJoin = PenLineJoin.Round
+            };
+            dc.DrawGeometry(null, checkPen, check);
         }
 
         /// <summary>按统一前缀信息绘制列表标记</summary>
