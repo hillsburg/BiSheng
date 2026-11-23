@@ -209,6 +209,17 @@ namespace BiSheng.Editor.Controls.MarkdownEditor
 
             Editor.TextArea.PreviewKeyDown += OnPreviewKeyDown;
             Editor.TextArea.Caret.PositionChanged += OnCaretPositionChanged;
+            Editor.TextArea.PreviewMouseLeftButtonDown += OnTextAreaMouseLeftButtonDown;
+            // AvalonEdit 先完成选区命中并标记事件已处理，随后才能改变光标行的排版。
+            Editor.TextArea.AddHandler(
+                MouseLeftButtonUpEvent,
+                new MouseButtonEventHandler(OnTextAreaMouseLeftButtonUp),
+                handledEventsToo: true);
+            Editor.TextArea.AddHandler(
+                LostMouseCaptureEvent,
+                new MouseEventHandler(OnTextAreaMouseCaptureLost),
+                handledEventsToo: true);
+            Editor.TextArea.MouseLeave += OnTextAreaMouseLeave;
             _documentModel.LineTypesChanged += OnLineTypesChanged;
             SyncCaretToLineTransformer();
         }
@@ -219,9 +230,57 @@ namespace BiSheng.Editor.Controls.MarkdownEditor
         /// </summary>
         private DocumentLine? _lastCaretLine;
 
-        /// <summary>光标移动时同步行内标记显隐（当前行保持源码可见）</summary>
+        private bool _isTextAreaLeftButtonGesture;
+
+        /// <summary>
+        /// 光标移动时同步行内标记显隐（当前行保持源码可见）。
+        /// 在文本区发起左键操作后保留原布局，避免图片改变行高，让松手位置误命中其他行。
+        /// </summary>
         private void OnCaretPositionChanged(object? sender, EventArgs e)
         {
+            if (!_isTextAreaLeftButtonGesture)
+            {
+                SyncCaretToLineTransformer(redrawIfLineChanged: true);
+            }
+        }
+
+        /// <summary>在 AvalonEdit 或图片控件移动光标之前开始延迟同步。</summary>
+        private void OnTextAreaMouseLeftButtonDown(object sender, MouseButtonEventArgs e)
+        {
+            _isTextAreaLeftButtonGesture = true;
+        }
+
+        /// <summary>补做正常松手时尚未完成的光标行同步。</summary>
+        private void OnTextAreaMouseLeftButtonUp(object sender, MouseButtonEventArgs e)
+            => FinishTextAreaLeftButtonGesture();
+
+        /// <summary>选区结束或捕获被抢占时恢复显示，处理松手事件未送达文本区的情况。</summary>
+        private void OnTextAreaMouseCaptureLost(object sender, MouseEventArgs e)
+        {
+            if (ReferenceEquals(e.OriginalSource, Editor.TextArea) && !Editor.TextArea.IsMouseCaptured)
+            {
+                FinishTextAreaLeftButtonGesture();
+            }
+        }
+
+        /// <summary>点击图片等未捕获鼠标的操作移出文本区后，松手事件可能发往其他控件。</summary>
+        private void OnTextAreaMouseLeave(object sender, MouseEventArgs e)
+        {
+            if (!Editor.TextArea.IsMouseCaptured)
+            {
+                FinishTextAreaLeftButtonGesture();
+            }
+        }
+
+        /// <summary>结束延迟，按最终光标位置一次性刷新离开行与进入行。</summary>
+        private void FinishTextAreaLeftButtonGesture()
+        {
+            if (!_isTextAreaLeftButtonGesture)
+            {
+                return;
+            }
+
+            _isTextAreaLeftButtonGesture = false;
             SyncCaretToLineTransformer(redrawIfLineChanged: true);
         }
 
