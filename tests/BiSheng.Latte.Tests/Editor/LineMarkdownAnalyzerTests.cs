@@ -1,4 +1,4 @@
-using BiSheng.Editor.Model;
+﻿using BiSheng.Editor.Model;
 using BiSheng.Editor.Parsing;
 
 namespace BiSheng.Latte.Tests.Editor;
@@ -67,6 +67,33 @@ public sealed class LineMarkdownAnalyzerTests
     {
         Assert.False(LineMarkdownAnalyzer.TryGetListPrefixInfo("普通文字", out _));
         Assert.Equal(0, LineMarkdownAnalyzer.GetListPrefixLength("普通文字"));
+    }
+
+    /// <summary>任务前缀保留缩进和原来的列表符号，并提供可独立替换的状态偏移。</summary>
+    [Theory]
+    [InlineData("- [ ] 任务", 0, 6, 3, ' ')]
+    [InlineData("  * [x] 任务", 2, 8, 5, 'x')]
+    [InlineData("+ [X]", 0, 5, 3, 'X')]
+    public void TaskListPrefix_KeepsIndentAndTracksState(string line, int indent, int end, int state, char value)
+    {
+        Assert.Equal(LineType.TaskList, LineMarkdownAnalyzer.AnalyzeLineType(line));
+        Assert.True(LineMarkdownAnalyzer.TryGetListPrefixInfo(line, out var prefix));
+        Assert.Equal(indent, prefix.IndentLength);
+        Assert.Equal(end, prefix.PrefixLength);
+        Assert.Equal(state, prefix.TaskStateOffset);
+        Assert.Equal(value, line[state]);
+    }
+
+    /// <summary>链接、普通列表正文和有序列表仍使用已有的排版规则。</summary>
+    [Theory]
+    [InlineData("- [x](note.md)", LineType.BulletList)]
+    [InlineData("- [x]紧跟正文", LineType.BulletList)]
+    [InlineData("1. [x] 有序", LineType.OrderedList)]
+    public void TaskListPrefix_RequiresAnUnorderedTaskMarker(string line, LineType type)
+    {
+        Assert.Equal(type, LineMarkdownAnalyzer.AnalyzeLineType(line));
+        Assert.True(LineMarkdownAnalyzer.TryGetListPrefixInfo(line, out var prefix));
+        Assert.Null(prefix.TaskStateOffset);
     }
 
     // ===== 行内标记：单一语法的偏移 =====

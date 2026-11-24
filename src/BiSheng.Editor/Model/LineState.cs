@@ -19,7 +19,8 @@
         CodeBlockContent,
         HorizontalRule,
         Image,
-        EmptyLine
+        EmptyLine,
+        TaskList
     }
 
     /// <summary>

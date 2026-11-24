@@ -23,6 +23,7 @@ namespace BiSheng.Editor.Controls.MarkdownEditor
         private MarkdownLineTransformer? _lineTransformer;
         private LineBackgroundRenderer? _backgroundRenderer;
         private ImageRenderer? _imageRenderer;
+        private TaskListRenderer? _taskListRenderer;
         private BlockElementGenerator? _blockElementGenerator;
         private HorizontalRuleRenderer? _horizontalRuleRenderer;
         private SyntaxCollapser? _syntaxCollapser;
@@ -190,6 +191,8 @@ namespace BiSheng.Editor.Controls.MarkdownEditor
             _blockElementGenerator = new BlockElementGenerator(_documentModel, _theme);
             _horizontalRuleRenderer = new HorizontalRuleRenderer(_documentModel, _theme);
             _syntaxCollapser = new SyntaxCollapser(_documentModel);
+            _taskListRenderer = new TaskListRenderer(
+                _documentModel, Editor, _theme, (ControlTemplate)Resources["TaskCheckBoxTemplate"]);
 
             var textView = Editor.TextArea.TextView;
             textView.LineSpacing = LineSpacing;
@@ -200,6 +203,7 @@ namespace BiSheng.Editor.Controls.MarkdownEditor
             textView.ElementGenerators.Add(_blockElementGenerator);
             textView.ElementGenerators.Add(_horizontalRuleRenderer);
             textView.ElementGenerators.Add(_syntaxCollapser);
+            textView.ElementGenerators.Add(_taskListRenderer);
 
             // 左侧标题标记 Margin（H1~H6 标签），通过 LeftMargins 添加到 TextArea 左侧边栏。
             // 行号和分割虚线通过 ShowLineNumbers=True 自动添加到 RightMargins（右侧边栏），
@@ -489,11 +493,50 @@ namespace BiSheng.Editor.Controls.MarkdownEditor
             {
                 HandleCopy();
             }
-            else if (e.Key == Key.Back && Editor.SelectionLength == 0)
+            else if (e.Key == Key.Enter && Keyboard.Modifiers == ModifierKeys.None && HandleTaskListEnter())
+            {
+                e.Handled = true;
+            }
+            else if (e.Key == Key.Back && !Editor.IsReadOnly && Editor.SelectionLength == 0)
             {
                 if (HandleBackspaceDeleteSyntax())
+                {
                     e.Handled = true;
+                }
             }
+        }
+
+        /// <summary>任务项行尾回车时续写同缩进的未完成项；空任务项回车退出列表。</summary>
+        private bool HandleTaskListEnter()
+        {
+            if (Editor.IsReadOnly || Editor.SelectionLength != 0)
+            {
+                return false;
+            }
+
+            var document = Editor.Document;
+            var line = document.GetLineByOffset(Editor.CaretOffset);
+            var state = _documentModel?.GetLineState(line.LineNumber - 1);
+            if (Editor.CaretOffset != line.EndOffset || state?.Type != LineType.TaskList
+                || !LineMarkdownAnalyzer.TryGetListPrefixInfo(state.RawText, out var prefix)
+                || prefix.TaskStateOffset is not int stateOffset)
+            {
+                return false;
+            }
+
+            if (prefix.PrefixLength == line.Length)
+            {
+                document.Remove(line.Offset, line.Length);
+                return true;
+            }
+
+            // 复用原列表符号和缩进，续写项一律从未完成开始。
+            string newLine = TextUtilities.GetNewLineFromDocument(document, line.LineNumber);
+            string nextTask = newLine + state.RawText[..stateOffset] + " ] ";
+            int offset = line.EndOffset;
+            document.Insert(offset, nextTask);
+            Editor.CaretOffset = offset + nextTask.Length;
+            return true;
         }
 
         /// <summary>
@@ -514,13 +557,14 @@ namespace BiSheng.Editor.Controls.MarkdownEditor
             int caretColumn = caretOffset - line.Offset;
 
             // 分析行类型并计算前缀长度
-            var lineType = LineMarkdownAnalyzer.AnalyzeLineType(text);
+            var lineType = _documentModel?.GetLineState(line.LineNumber - 1).Type
+                ?? LineMarkdownAnalyzer.AnalyzeLineType(text);
             int prefixLen = lineType switch
             {
                 LineType.Heading1 or LineType.Heading2 or LineType.Heading3
                 or LineType.Heading4 or LineType.Heading5 or LineType.Heading6
                     => LineMarkdownAnalyzer.GetHeadingPrefixLength(text),
-                LineType.BulletList or LineType.OrderedList
+                LineType.BulletList or LineType.OrderedList or LineType.TaskList
                     => LineMarkdownAnalyzer.GetListPrefixLength(text),
                 LineType.BlockQuote
                     => LineMarkdownAnalyzer.GetBlockQuotePrefixLength(text),
@@ -635,6 +679,11 @@ namespace BiSheng.Editor.Controls.MarkdownEditor
         private void ApplyTheme(MarkdownTheme theme)
         {
             _theme = theme;
+            if (_taskListRenderer != null)
+            {
+                _taskListRenderer.Theme = theme;
+            }
+
             Editor.Background = theme.BackgroundColor;
             Editor.Foreground = theme.TextColor;
 

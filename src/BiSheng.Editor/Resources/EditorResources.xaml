@@ -1,0 +1,6 @@
+﻿<ResourceDictionary xmlns="http://schemas.microsoft.com/winfx/2006/xaml/presentation">
+    <!-- 编辑器默认资源的统一入口；新增样式字典时在此登记。 -->
+    <ResourceDictionary.MergedDictionaries>
+        <ResourceDictionary Source="TaskListTemplates.xaml" />
+    </ResourceDictionary.MergedDictionaries>
+</ResourceDictionary>
