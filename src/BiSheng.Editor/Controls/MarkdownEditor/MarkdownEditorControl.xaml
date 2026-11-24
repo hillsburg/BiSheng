@@ -5,6 +5,10 @@
     xmlns:avalonedit="http://icsharpcode.net/sharpdevelop/avalonedit"
     Background="{Binding RelativeSource={RelativeSource Self}, Path=Theme.BackgroundColor}">
 
+    <UserControl.Resources>
+        <ResourceDictionary Source="../../Resources/EditorResources.xaml" />
+    </UserControl.Resources>
+
     <!--
         Markdown 编辑器主控件。
         

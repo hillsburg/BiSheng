@@ -65,8 +65,13 @@ namespace BiSheng.Editor.Parsing
             if (HorizontalRuleRegex.IsMatch(line))
                 return LineType.HorizontalRule;
 
-            if (BulletListRegex.IsMatch(line))
-                return LineType.BulletList;
+            var bulletMatch = BulletListRegex.Match(line);
+            if (bulletMatch.Success)
+            {
+                return GetBulletPrefixInfo(line, bulletMatch).TaskStateOffset.HasValue
+                    ? LineType.TaskList
+                    : LineType.BulletList;
+            }
 
             if (OrderedListRegex.IsMatch(line))
                 return LineType.OrderedList;
@@ -318,17 +323,14 @@ namespace BiSheng.Editor.Parsing
         }
 
         /// <summary>
-        /// 解析列表前缀：缩进、整段前缀长度、有序序号（无序为 null）
+        /// 解析列表前缀，提供缩进、前缀长度、序号和任务状态字符的位置。
         /// </summary>
         public static bool TryGetListPrefixInfo(string line, out ListPrefixInfo info)
         {
             var bulletMatch = BulletListRegex.Match(line);
             if (bulletMatch.Success)
             {
-                info = new ListPrefixInfo(
-                    bulletMatch.Groups[1].Length,
-                    bulletMatch.Length,
-                    orderedNumber: null);
+                info = GetBulletPrefixInfo(line, bulletMatch);
                 return true;
             }
 
@@ -345,6 +347,30 @@ namespace BiSheng.Editor.Parsing
             info = default;
             return false;
         }
+
+        /// <summary>复用无序列表前缀，识别任务标记；行尾的空任务项也可以继续编辑。</summary>
+        private static ListPrefixInfo GetBulletPrefixInfo(string line, Match bulletMatch)
+        {
+            int indent = bulletMatch.Groups[1].Length;
+            int markerStart = bulletMatch.Length;
+            int markerEnd = markerStart + 3;
+            if (markerEnd > line.Length
+                || line[markerStart] != '['
+                || line[markerStart + 1] is not (' ' or '\t' or 'x' or 'X')
+                || line[markerStart + 2] != ']'
+                || (markerEnd < line.Length && !char.IsWhiteSpace(line[markerEnd])))
+            {
+                return new ListPrefixInfo(indent, markerStart, orderedNumber: null);
+            }
+
+            int prefixEnd = markerEnd;
+            while (prefixEnd < line.Length && char.IsWhiteSpace(line[prefixEnd]))
+            {
+                prefixEnd++;
+            }
+
+            return new ListPrefixInfo(indent, prefixEnd, orderedNumber: null, taskStateOffset: markerStart + 1);
+        }
     }
 
     /// <summary>列表行前缀解析结果</summary>
@@ -359,15 +385,19 @@ namespace BiSheng.Editor.Parsing
         /// <summary>有序列表数字；无序为 null</summary>
         public string? OrderedNumber { get; }
 
+        /// <summary>任务项方括号内的字符相对于行首的位置；普通列表为 null。</summary>
+        public int? TaskStateOffset { get; }
+
         /// <summary>是否为有序列表</summary>
         public bool IsOrdered => OrderedNumber != null;
 
         /// <summary>构造前缀信息</summary>
-        public ListPrefixInfo(int indentLength, int prefixLength, string? orderedNumber)
+        public ListPrefixInfo(int indentLength, int prefixLength, string? orderedNumber, int? taskStateOffset = null)
         {
             IndentLength = indentLength;
             PrefixLength = prefixLength;
             OrderedNumber = orderedNumber;
+            TaskStateOffset = taskStateOffset;
         }
     }
 }
