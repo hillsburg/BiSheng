@@ -190,12 +190,15 @@
                             MouseDoubleClick="OnOutlineTreeDoubleClick"
                             VirtualizingPanel.IsVirtualizing="True"
                             VirtualizingPanel.VirtualizationMode="Recycling">
-                            <TreeView.ItemContainerStyle>
+                            <TreeView.Resources>
                                 <Style BasedOn="{StaticResource NavTreeViewItemStyle}" TargetType="TreeViewItem">
                                     <Setter Property="Cursor" Value="Hand" />
                                     <Setter Property="FontSize" Value="13" />
+                                    <!-- 树容器可能因虚拟化或换父级而重建，状态由大纲节点保留。 -->
+                                    <Setter Property="IsExpanded" Value="{Binding IsExpanded, Mode=TwoWay}" />
+                                    <Setter Property="IsSelected" Value="{Binding IsSelected, Mode=TwoWay}" />
                                 </Style>
-                            </TreeView.ItemContainerStyle>
+                            </TreeView.Resources>
                             <TreeView.ItemTemplate>
                                 <HierarchicalDataTemplate ItemsSource="{Binding Children}">
                                     <TextBlock

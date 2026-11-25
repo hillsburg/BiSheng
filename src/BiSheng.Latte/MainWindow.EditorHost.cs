@@ -1,4 +1,4 @@
-using System.Threading;
+﻿using System.Threading;
 using System.Threading.Tasks;
 using System.Windows;
 using System.Windows.Input;
@@ -25,6 +25,8 @@ public partial class MainWindow
         _vm.Editor.AttachLiveTextProvider(() => NoteEditor.Text);
         NoteEditor.TextEditor.TextChanged += (_, _) =>
         {
+            // 等待去抖期间就淘汰旧快照，避免旧后台任务把大纲回退到编辑前。
+            Interlocked.Increment(ref _outlineRefreshVersion);
             if (!_isLoadingNote)
             {
                 _vm.Editor.MarkContentChanged();
@@ -60,7 +62,7 @@ public partial class MainWindow
                 NoteEditor.TextEditor.ScrollToVerticalOffset(scroll);
             }, DispatcherPriority.Background);
 
-            RequestOutlineRefresh(deferred: true);
+            RequestOutlineRefresh();
         });
 
         _vm.NoteSwitching += note =>
@@ -74,8 +76,7 @@ public partial class MainWindow
             }
 
             _isLoadingNote = true;
-            _outlineTimer?.Stop();
-            Interlocked.Increment(ref _outlineRefreshVersion);
+            ResetOutline();
 
             _vm.Editor.LoadNote(note, NoteEditor.Text);
             NoteEditor.Text = _vm.Editor.EditorContent;
@@ -125,17 +126,15 @@ public partial class MainWindow
             }
 
             _isLoadingNote = false;
-            RequestOutlineRefresh(deferred: true);
+            RequestOutlineRefresh();
         };
 
         _vm.NoteClosed += () => Dispatcher.Invoke(() =>
         {
             _isLoadingNote = true;
-            _outlineTimer?.Stop();
-            Interlocked.Increment(ref _outlineRefreshVersion);
+            ResetOutline();
             NoteEditor.Text = string.Empty;
             _isLoadingNote = false;
-            RequestOutlineRefresh(deferred: false);
         });
 
         _vm.NoteList.NoteCreated += note =>
@@ -143,10 +142,11 @@ public partial class MainWindow
             Dispatcher.Invoke(() =>
             {
                 _isLoadingNote = true;
+                ResetOutline();
                 _vm.Editor.LoadNote(note, NoteEditor.Text);
                 NoteEditor.Text = _vm.Editor.EditorContent;
                 _isLoadingNote = false;
-                RequestOutlineRefresh(deferred: true);
+                RequestOutlineRefresh();
             });
         };
 
@@ -214,6 +214,14 @@ public partial class MainWindow
             settings.BodySize);
     }
 
+    /// <summary>切换或关闭笔记时清空大纲，并阻止旧笔记的异步结果回写。</summary>
+    private void ResetOutline()
+    {
+        _outlineTimer?.Stop();
+        Interlocked.Increment(ref _outlineRefreshVersion);
+        _vm.Outline.Reset();
+    }
+
     /// <summary>延迟刷新大纲（去抖；长文延长间隔）</summary>
     private void ScheduleOutlineRefresh()
     {
@@ -248,22 +256,15 @@ public partial class MainWindow
         RefreshOutline();
     }
 
-    /// <summary>请求刷新大纲；加载大笔记时可延迟到 Background 优先级</summary>
-    private void RequestOutlineRefresh(bool deferred)
+    /// <summary>笔记加载后在后台优先级请求刷新，让编辑器先完成布局。</summary>
+    private void RequestOutlineRefresh()
     {
         if (!_vm.IsOutlinePanelVisible)
         {
             return;
         }
 
-        if (deferred)
-        {
-            Dispatcher.BeginInvoke(RefreshOutline, DispatcherPriority.Background);
-        }
-        else
-        {
-            RefreshOutline();
-        }
+        Dispatcher.BeginInvoke(RefreshOutline, DispatcherPriority.Background);
     }
 
     /// <summary>从编辑器 Markdown 异步刷新大纲 ViewModel</summary>
@@ -281,17 +282,20 @@ public partial class MainWindow
     {
         var version = Interlocked.Increment(ref _outlineRefreshVersion);
 
-        // 单次快照；解析与建树在线程池完成，避免大笔记阻塞 UI
-        var text = NoteEditor.Text;
+        // 后台只读取不可变文本；锚点和绑定集合留在 UI 线程上更新。
+        var document = NoteEditor.TextEditor.Document;
+        var text = document.Text;
         var flatItems = await Task.Run(() => OutlineViewModel.ParseFlatHeadings(text))
             .ConfigureAwait(true);
 
-        if (version != Volatile.Read(ref _outlineRefreshVersion))
+        if (version != Volatile.Read(ref _outlineRefreshVersion)
+            || _isLoadingNote || !_vm.IsOutlinePanelVisible
+            || !ReferenceEquals(document, NoteEditor.TextEditor.Document))
         {
             return;
         }
 
-        _vm.Outline.ApplyHeadings(flatItems);
+        _vm.Outline.ApplyHeadings(document, flatItems);
     }
 
     /// <summary>双击大纲条目跳转到编辑器对应行</summary>
@@ -303,9 +307,13 @@ public partial class MainWindow
         }
 
         var editor = NoteEditor.TextEditor;
-        editor.ScrollToLine(item.LineNumber + 1);
+        var line = _vm.Outline.FindHeadingLine(editor.Document, item);
+        if (line == null)
+        {
+            return;
+        }
 
-        var line = editor.Document.GetLineByNumber(item.LineNumber + 1);
+        editor.ScrollToLine(line.LineNumber);
         editor.CaretOffset = line.Offset;
         editor.TextArea.Caret.BringCaretToView();
     }
