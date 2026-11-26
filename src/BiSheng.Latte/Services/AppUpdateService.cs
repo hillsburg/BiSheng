@@ -1,4 +1,4 @@
-using Velopack;
+﻿using Velopack;
 using Velopack.Sources;
 
 namespace BiSheng.Latte.Services;
@@ -144,11 +144,11 @@ public sealed class AppUpdateService
     }
 
     /// <summary>下载并应用更新后重启（须已确认）</summary>
-    /// <param name="beforeRestart">下载完成后、进程重启前的回调（释放托盘 / DI 等）</param>
+    /// <param name="beforeRestart">下载后的准备操作；调用方负责调度到所需线程，安装会等它完成。</param>
     public async Task DownloadAndApplyAsync(
         AppUpdateCheckResult result,
         IProgress<int>? progress = null,
-        Action? beforeRestart = null,
+        Func<Task>? beforeRestart = null,
         CancellationToken cancellationToken = default)
     {
         if (result.Availability != AppUpdateAvailability.UpdateAvailable
@@ -158,13 +158,25 @@ public sealed class AppUpdateService
             throw new InvalidOperationException("没有可应用的更新。");
         }
 
-        await result.Manager.DownloadUpdatesAsync(
+        var download = result.Manager.DownloadUpdatesAsync(
             result.UpdateInfo,
             progress == null ? null : p => progress.Report(p),
-            cancelToken: cancellationToken).ConfigureAwait(false);
+            cancelToken: cancellationToken);
 
-        beforeRestart?.Invoke();
-        result.Manager.ApplyUpdatesAndRestart(result.UpdateInfo);
+        await CompleteUpdateAsync(download, beforeRestart,
+            () => result.Manager.ApplyUpdatesAndRestart(result.UpdateInfo)).ConfigureAwait(false);
+    }
+
+    /// <summary>下载和重启准备均成功后才启动安装，避免 Velopack 提前结束应用进程。</summary>
+    internal static async Task CompleteUpdateAsync(Task download, Func<Task>? beforeRestart, Action applyAndRestart)
+    {
+        await download.ConfigureAwait(false);
+        if (beforeRestart != null)
+        {
+            await beforeRestart().ConfigureAwait(false);
+        }
+
+        applyAndRestart();
     }
 
     /// <summary>创建指向公开仓 Releases 的 UpdateManager</summary>
