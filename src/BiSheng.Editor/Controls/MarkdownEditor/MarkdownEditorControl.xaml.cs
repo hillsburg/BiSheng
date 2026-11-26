@@ -506,7 +506,7 @@ namespace BiSheng.Editor.Controls.MarkdownEditor
             }
         }
 
-        /// <summary>任务项行尾回车时续写同缩进的未完成项；空任务项回车退出列表。</summary>
+        /// <summary>有正文的任务项在行尾回车时续写；只有勾选框时按普通换行处理。</summary>
         private bool HandleTaskListEnter()
         {
             if (Editor.IsReadOnly || Editor.SelectionLength != 0)
@@ -526,8 +526,8 @@ namespace BiSheng.Editor.Controls.MarkdownEditor
 
             if (prefix.PrefixLength == line.Length)
             {
-                document.Remove(line.Offset, line.Length);
-                return true;
+                // 单独的勾选框也有意义，交给 AvalonEdit 换行以保留上一行的内容和状态。
+                return false;
             }
 
             // 复用原列表符号和缩进，续写项一律从未完成开始。
