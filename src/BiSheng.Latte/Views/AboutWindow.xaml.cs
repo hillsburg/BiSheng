@@ -1,4 +1,4 @@
-using System.Windows;
+﻿using System.Windows;
 using BiSheng.Latte.Services;
 
 namespace BiSheng.Latte.Views;
@@ -112,21 +112,7 @@ public partial class AboutWindow : Window
             await _updates.DownloadAndApplyAsync(
                 _pendingUpdate,
                 progress,
-                beforeRestart: () =>
-                {
-                    // Velopack 会结束进程；先落盘并释放托盘，避免托盘幽灵进程
-                    StatusText.Text = "即将重启以完成更新…";
-                    _prepareForUpdateRestart?.Invoke();
-                    try
-                    {
-                        Composition.LatteHost.Dispose();
-                    }
-                    catch (Exception ex)
-                    {
-                        LogHelper.Error("更新前释放服务失败", ex);
-                    }
-                });
-            StatusText.Text = "即将重启以完成更新…";
+                beforeRestart: () => Dispatcher.InvokeAsync(PrepareForRestart).Task);
         }
         catch (Exception ex)
         {
@@ -137,6 +123,21 @@ public partial class AboutWindow : Window
             CheckUpdateButton.IsEnabled = true;
             ApplyUpdateButton.IsEnabled = true;
             DownloadProgress.Visibility = Visibility.Collapsed;
+        }
+    }
+
+    /// <summary>回到窗口线程完成状态更新、保存和清理，在进程退出前让这些操作全部结束。</summary>
+    private void PrepareForRestart()
+    {
+        StatusText.Text = "即将重启以完成更新…";
+        _prepareForUpdateRestart?.Invoke();
+        try
+        {
+            Composition.LatteHost.Dispose();
+        }
+        catch (Exception ex)
+        {
+            LogHelper.Error("更新前释放服务失败", ex);
         }
     }
 }

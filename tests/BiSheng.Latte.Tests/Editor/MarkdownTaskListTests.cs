@@ -65,7 +65,7 @@ public sealed class MarkdownTaskListTests
         Assert.DoesNotContain(codeLine.Elements.OfType<InlineObjectElement>(), item => item.Element is CheckBox);
     }
 
-    /// <summary>回车复用列表符号、缩进及换行符，空项退出后可用退格移除其他任务项的前缀。</summary>
+    /// <summary>有正文时续写，空任务项按回车保留，退格仍可移除任务前缀。</summary>
     private static void VerifyEditingKeys(TextEditor editor)
     {
         using var source = new HwndSource(new HwndSourceParameters("MarkdownTaskListTests"));
@@ -76,12 +76,31 @@ public sealed class MarkdownTaskListTests
         Assert.Equal("列表\r\n  * [X] 任务\r\n  * [ ] ", editor.Text);
         Assert.Equal(editor.Document.TextLength, editor.CaretOffset);
 
-        PressKey(editor, source, Key.Enter);
-        Assert.Equal("列表\r\n  * [X] 任务\r\n", editor.Text);
+        PressKey(editor, source, Key.Enter, handledByMarkdown: false);
+        Assert.StartsWith("列表\r\n  * [X] 任务\r\n  * [ ] \r\n", editor.Text);
+        Assert.Equal(4, editor.TextArea.Caret.Line);
+        var blankLine = editor.Document.GetLineByNumber(4);
+        Assert.True(string.IsNullOrWhiteSpace(editor.Document.GetText(blankLine.Offset, blankLine.Length)));
 
         editor.CaretOffset = "列表\r\n  * [X] ".Length;
         PressKey(editor, source, Key.Back);
-        Assert.Equal("列表\r\n任务\r\n", editor.Text);
+        Assert.StartsWith("列表\r\n任务\r\n  * [ ] \r\n", editor.Text);
+
+        VerifyEmptyTaskEnter(editor, source, "- [ ]", isChecked: false);
+        VerifyEmptyTaskEnter(editor, source, "- [x]", isChecked: true);
+    }
+
+    /// <summary>验证手输的空任务项换行后仍渲染，光标在下一行，勾选状态保留。</summary>
+    private static void VerifyEmptyTaskEnter(TextEditor editor, PresentationSource source, string task, bool isChecked)
+    {
+        editor.Text = "列表\r\n" + task;
+        editor.CaretOffset = editor.Document.TextLength;
+
+        PressKey(editor, source, Key.Enter, handledByMarkdown: false);
+
+        Assert.Equal("列表\r\n" + task + "\r\n", editor.Text);
+        Assert.Equal(3, editor.TextArea.Caret.Line);
+        Assert.Equal(isChecked, GetCheckbox(editor, 2).IsChecked);
     }
 
     /// <summary>切换主题和字号后，验证实际模板使用新配色，且勾选状态不改变方框尺寸。</summary>
@@ -119,14 +138,19 @@ public sealed class MarkdownTaskListTests
         return Assert.IsType<CheckBox>(Assert.Single(visualLine.Elements.OfType<InlineObjectElement>()).Element);
     }
 
-    /// <summary>发送与编辑器键盘输入使用的同一个 WPF 路由事件。</summary>
-    private static void PressKey(TextEditor editor, PresentationSource source, Key key)
+    /// <summary>发送预览键盘事件，未拦截的回车执行 AvalonEdit 的默认换行操作。</summary>
+    private static void PressKey(TextEditor editor, PresentationSource source, Key key, bool handledByMarkdown = true)
     {
         var args = new KeyEventArgs(Keyboard.PrimaryDevice, source, 0, key)
         {
             RoutedEvent = Keyboard.PreviewKeyDownEvent
         };
         editor.TextArea.RaiseEvent(args);
-        Assert.True(args.Handled);
+        Assert.Equal(handledByMarkdown, args.Handled);
+        if (!args.Handled && key == Key.Enter)
+        {
+            // 直接发预览事件不会继续执行输入绑定，显式调用 OnEnter 使用的文本输入。
+            editor.TextArea.PerformTextInput("\n");
+        }
     }
 }
